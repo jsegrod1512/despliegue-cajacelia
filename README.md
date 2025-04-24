@@ -2,6 +2,7 @@
 Repositorio con el playbook de ansible para el Proyecto de Cajacelia, despliegue de Webserver, Servidor de BBDD y Servidor LDAP
 
 La estructura del repositorio es la siguiente:
+```bash
 ansible-cajacelia/
 ├── .gitignore
 ├── README.md
@@ -38,9 +39,10 @@ ansible-cajacelia/
 ├── host_vars/
 │   └── server1.yml            # Variables para un host concreto si hace falta
 └── site.yml                   # Playbook principal (incluye roles y despliega todo)
+```
 
 # 1. 
 Ejecutaremos un playbook con:
-``` bash
+```bash
    ansible-playbook -i inventory/production.ini site.yml
 ```
