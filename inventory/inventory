@@ -1,20 +1,18 @@
-[DMZ]
+[webserver]
 webserver ansible_host=10.1.0.10
 
-[LAN]
-bbdd ansible_host=172.16.1.10
-ldap ansible_host=172.16.1.11
-
-[webserver]
-webserver
-
-[bbdd]
-bbdd
+[database]
+database ansible_host=172.16.1.10
 
 [ldap]
-ldap
+ldap ansible_host=172.16.1.11
+
+[ci_cd]
+ci-cd ansible_host=172.16.1.12
+
+[client]
+client ansible_host=10.1.0.100    # Si quieres gestionar el cliente por Ansible, o déjalo vacío si solo es GUI
 
 [all:vars]
-ansible_user=ubuntu
-ansible_ssh_private_key_file=/home/ubuntu/Lab/vockey.pem
-ansible_ssh_common_args='-o StrictHostKeyChecking=accept-new'
+ansible_connection=ssh            # Usa SSH para conectar a los nodos
+ansible_python_interpreter=/usr/bin/python3

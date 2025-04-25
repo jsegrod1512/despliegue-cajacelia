@@ -1,0 +1,45 @@
+---
+- name: Instalar Apache y PHP en los servidores web
+  hosts: webserver
+  become: true
+
+  vars:
+    php_packages:
+      - php
+      - libapache2-mod-php
+      - php-mysql
+
+  tasks:
+    - name: Instalar Apache2
+      apt:
+        name: apache2
+        state: present
+        update_cache: yes
+
+    - name: Instalar PHP y extensiones necesarias
+      apt:
+        name: "{{ php_packages }}"
+        state: present
+
+    - name: Asegurar que el servicio Apache está arrancado y habilitado
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+
+    - name: Desplegar página de prueba
+      copy:
+        dest: /var/www/html/index.php
+        content: |
+          <?php
+          phpinfo();
+          ?>
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    - name: Reiniciar Apache si cambia la página de prueba
+      service:
+        name: apache2
+        state: reloaded
+      when: "'index.php' in ansible_facts.changed_files"

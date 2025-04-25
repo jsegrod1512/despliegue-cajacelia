@@ -1,0 +1,39 @@
+---
+- name: Desplegar OpenLDAP en los servidores de autenticación
+  hosts: ldap
+  become: true
+
+  vars:
+    ldap_domain: "cajacelia.es"
+    ldap_organization: "CajaCelia"
+    ldap_admin_password: "OtroPasswordSeguro"   # Mejor en vault
+
+  tasks:
+    - name: Instalar OpenLDAP y utilidades
+      apt:
+        name:
+          - slapd
+          - ldap-utils
+        state: present
+        update_cache: yes
+
+    - name: Reconfigurar slapd en modo no interactivo
+      debconf:
+        name: slapd
+        question: "{{ item.question }}"
+        vtype: "{{ item.vtype }}"
+        value: "{{ item.value }}"
+      loop:
+        - { question: "slapd/password1", vtype: "password", value: "{{ ldap_admin_password }}" }
+        - { question: "slapd/password2", vtype: "password", value: "{{ ldap_admin_password }}" }
+        - { question: "slapd/domain",      vtype: "string",   value: "{{ ldap_domain }}" }
+        - { question: "slapd/organization",vtype: "string",   value: "{{ ldap_organization }}" }
+
+    - name: Reconfigurar slapd
+      command: dpkg-reconfigure -f noninteractive slapd
+
+    - name: Asegurar que slapd está arrancado y habilitado
+      service:
+        name: slapd
+        state: started
+        enabled: yes

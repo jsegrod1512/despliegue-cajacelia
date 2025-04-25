@@ -1,0 +1,4 @@
+---
+- import_playbook: playbooks/database.yml
+- import_playbook: playbooks/ldap.yml
+- import_playbook: playbooks/webserver.yml

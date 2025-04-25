@@ -1,0 +1,30 @@
+---
+- name: Instalar y configurar MySQL en los servidores de base de datos
+  hosts: database
+  become: true
+
+  vars:
+    mysql_root_password: "TuPasswordSegura"   # Cámbialo por variable en vault
+
+  tasks:
+    - name: Instalar paquete mysql-server
+      apt:
+        name: mysql-server
+        state: present
+        update_cache: yes
+
+    - name: Asegurar que el servicio mysql está arrancado y habilitado
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: Configurar contraseña de root y aplicar ajustes de seguridad
+      mysql_secure_installation:
+        login_password: ""
+        root_password: "{{ mysql_root_password }}"
+        change_root_password: yes
+        remove_anonymous_users: yes
+        disallow_root_login_remotely: yes
+        remove_test_db: yes
+        state: present
