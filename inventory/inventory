@@ -1,0 +1,20 @@
+[DMZ]
+webserver ansible_host=10.1.0.10
+
+[LAN]
+bbdd ansible_host=172.16.1.10
+ldap ansible_host=172.16.1.11
+
+[webserver]
+webserver
+
+[bbdd]
+bbdd
+
+[ldap]
+ldap
+
+[all:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=/home/ubuntu/Lab/vockey.pem
+ansible_ssh_common_args='-o StrictHostKeyChecking=accept-new'

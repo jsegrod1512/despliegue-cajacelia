@@ -41,7 +41,12 @@ ansible-cajacelia/
 └── site.yml                   # Playbook principal (incluye roles y despliega todo)
 ```
 
-# 1. 
+## 1.
+Primero nos aseguramos que nuestra clave publica del servidor maestro esté copiada en los esclavos
+```bash
+   ssh-copy-id -i ~/.ssh/id_rsa.pub ubuntu@IP_DEL_ESCLAVO
+```
+
 Ejecutaremos un playbook con:
 ```bash
    ansible-playbook -i inventory/production.ini site.yml
