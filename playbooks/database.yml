@@ -3,28 +3,32 @@
   hosts: database
   become: true
 
-  vars:
-    mysql_root_password: "TuPasswordSegura"   # Cámbialo por variable en vault
+  vars_files:
+    - ../vars/variables.yml
 
   tasks:
-    - name: Instalar paquete mysql-server
+
+    - name: Actualizar los repositorios
+      apt:
+        update_cache: yes
+
+    - name: Instalar el sistema gestor de bases de datos MySQL
       apt:
         name: mysql-server
         state: present
-        update_cache: yes
 
-    - name: Asegurar que el servicio mysql está arrancado y habilitado
+    - name: Instalamos el módulo de pymysql
+      apt:
+        name: python3-pymysql
+        state: present
+
+    - name: Configuramos MySQL para permitir conexiones desde cualquier interfaz
+      replace:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: 127.0.0.1
+        replace: "{{ ip.backend }}"
+
+    - name: Reiniciamos el servicio de base de datos
       service:
         name: mysql
-        state: started
-        enabled: yes
-
-    - name: Configurar contraseña de root y aplicar ajustes de seguridad
-      mysql_secure_installation:
-        login_password: ""
-        root_password: "{{ mysql_root_password }}"
-        change_root_password: yes
-        remove_anonymous_users: yes
-        disallow_root_login_remotely: yes
-        remove_test_db: yes
-        state: present
+        state: restarted

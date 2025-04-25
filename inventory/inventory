@@ -1,18 +1,14 @@
 [webserver]
-webserver ansible_host=10.1.0.10
+10.1.0.10
+
+[ci-cd]
+172.16.1.10
 
 [database]
-database ansible_host=172.16.1.10
+172.16.1.11
 
 [ldap]
-ldap ansible_host=172.16.1.11
-
-[ci_cd]
-ci-cd ansible_host=172.16.1.12
-
-[client]
-client ansible_host=10.1.0.100    # Si quieres gestionar el cliente por Ansible, o déjalo vacío si solo es GUI
+172.16.1.12
 
 [all:vars]
-ansible_connection=ssh            # Usa SSH para conectar a los nodos
 ansible_python_interpreter=/usr/bin/python3
