@@ -38,19 +38,29 @@ Vagrant.configure("2") do |config|
       ip: "172.16.1.10",
       virtualbox__intnet: "LAN"
   
-    # Provisionamiento LOCAL de Ansible
-    node.vm.provision "ansible_local" do |ansible|
-      ansible.playbook = "site.yml"
-      ansible.inventory_path = "inventory/inventory"      # Donde están tus playbooks (.yml)
-    end
-  
     node.vm.provider "virtualbox" do |vb|
       vb.memory = 2048
       vb.gui    = false
     end
+
+    config.vm.synced_folder ".", "/vagrant/despliegue-cajacelia", type: "virtualbox"
+      
+    node.vm.provision "ansible_local" do |ansible|
+      ansible.playbook = "/vagrant/despliegue-cajacelia/site.yml"
+      ansible.inventory_path = "/vagrant/despliegue-cajacelia/inventory/inventory"
+      ansible.verbose = true
+    end
   end
 
-  # 5) VM Cliente Ubuntu Desktop (LAN, DHCP)
+  # # 5) Ansible
+  # config.vm.provision "ansible" do |ansible|
+  #   ansible.playbook = "site.yml"
+  #   # ansible.groups = {
+  #   #   "testclients" => ["testclient3"]
+  #   # }
+  # end
+
+  # 6) VM Cliente Ubuntu Desktop (LAN, DHCP)
   config.vm.define "client" do |node|
     node.vm.box = "ubuntu/jammy64"
     node.vm.hostname = "client"

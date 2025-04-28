@@ -2,44 +2,96 @@
 - name: Instalar Apache y PHP en los servidores web
   hosts: webserver
   become: true
-
-  vars:
-    php_packages:
-      - php
-      - libapache2-mod-php
-      - php-mysql
-
+    
   tasks:
-    - name: Instalar Apache2
+
+    - name: Actualizar los repositorios
       apt:
-        name: apache2
-        state: present
         update_cache: yes
 
-    - name: Instalar PHP y extensiones necesarias
+    - name: Instalar el servidor web Apache
       apt:
-        name: "{{ php_packages }}"
+        name: apache2
         state: present
 
-    - name: Asegurar que el servicio Apache está arrancado y habilitado
-      service:
-        name: apache2
-        state: started
-        enabled: yes
+    - name: Instalar PHP y los módulos necesarios
+      apt: 
+        name:
+          - php
+          - php-mysql
+          - libapache2-mod-php
+          - php-bcmath
+          - php-curl
+          - php-gd
+          - php-imagick
+          - php-intl
+          - php-memcached
+          - php-mbstring
+          - php-dom
+          - php-zip
+          - php-cli
+        state: present
 
-    - name: Desplegar página de prueba
+    - name: Modificamos el valor max_input_vars de PHP para Apache
+      replace: 
+        path: /etc/php/8.1/apache2/php.ini
+        regexp: ";max_input_vars = 1000"
+        replace: "max_input_vars = 5000"
+
+    - name: Modificamos el valor max_input_vars de PHP para CLI
+      replace:
+        path: /etc/php/8.1/cli/php.ini
+        regexp: ";max_input_vars = 1000"
+        replace: "max_input_vars = 5000"
+
+    - name: Modificamos el valor de memory_limit de PHP para Apache
+      replace: 
+        path: /etc/php/8.1/apache2/php.ini
+        regexp: "memory_limit = 128M"
+        replace: "memory_limit = 256M"
+
+    - name: Modificamos el valor de memory_limit de PHP para CLI
+      replace: 
+        path: /etc/php/8.1/cli/php.ini
+        regexp: "memory_limit = 128M"
+        replace: "memory_limit = 256M"
+
+    - name: Modificamos el valor de post_max_size de PHP para Apache
+      replace: 
+        path: /etc/php/8.1/apache2/php.ini
+        regexp: "post_max_size = 8M"
+        replace: "post_max_size = 128M"
+
+    - name: Modificamos el valor de post_max_size de PHP para CLI
+      replace: 
+        path: /etc/php/8.1/cli/php.ini
+        regexp: "post_max_size = 8M"
+        replace: "post_max_size = 128M"
+
+    - name: Modificamos el valor de upload_max_filesize de PHP para Apache
+      replace:
+        path: /etc/php/8.1/apache2/php.ini
+        regexp: "upload_max_filesize = 2M"
+        replace: "upload_max_filesize = 128M"
+
+    - name: Modificamos el valor de upload_max_filesize de PHP para CLI
+      replace:
+        path: /etc/php/8.1/cli/php.ini
+        regexp: "upload_max_filesize = 2M"
+        replace: "upload_max_filesize = 128M"
+
+    - name: Copiar el archivo de configuración de Apache
       copy:
-        dest: /var/www/html/index.php
-        content: |
-          <?php
-          phpinfo();
-          ?>
-        owner: www-data
-        group: www-data
-        mode: '0644'
+        src: ../templates/000-default.conf
+        dest: /etc/apache2/sites-available/
+        mode: 0755
 
-    - name: Reiniciar Apache si cambia la página de prueba
+    - name: Habilitar el módulo rewrite de Apache
+      apache2_module:
+        name: rewrite
+        state: present
+
+    - name: Reiniciar el servidor web Apache
       service:
         name: apache2
-        state: reloaded
-      when: "'index.php' in ansible_facts.changed_files"
+        state: restarted
