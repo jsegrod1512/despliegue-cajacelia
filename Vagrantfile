@@ -1,8 +1,16 @@
 Vagrant.configure("2") do |config|
-  # Usa Ubuntu Server LTS por defecto
+  # Deshabilita el montaje automático de /vagrant en todas las VMs
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  # Usa Ubuntu Server LTS por defectoz
   config.vm.box = "ubuntu/focal64"
   # Genera una clave SSH distinta para cada VM (mejor seguridad)
   config.ssh.insert_key = true
+  # Configuramos el DNS
+  config.vm.provision "shell", inline: <<-SHELL
+    echo "nameserver 1.1.1.1" > /etc/resolv.conf
+    echo "nameserver 149.112.112.112" >> /etc/resolv.conf
+  SHELL
+
 
   # 1) VM en DMZ: webserver
   config.vm.define "webserver" do |node|
@@ -10,7 +18,17 @@ Vagrant.configure("2") do |config|
     node.vm.network "private_network",
       ip: "10.1.0.10",
       virtualbox__intnet: "DMZ"      # internal network DMZ :contentReference[oaicite:0]{index=0}
+    # default router
+    node.vm.provision "shell",
+      run: "always",
+      inline: <<-SHELL
+        # Verificar si la ruta por defecto ya existe
+        if ! ip route | grep -q '^default via 10.1.0.1'; then
+          ip route add default via 10.1.0.1
+        fi
+      SHELL
     node.vm.provider "virtualbox" do |vb|
+      vb.name = "Webserver" 
       vb.memory = 1024
     end
   end
@@ -21,6 +39,15 @@ Vagrant.configure("2") do |config|
     node.vm.network "private_network",
       ip: "172.16.1.11",
       virtualbox__intnet: "LAN"
+    # default router
+    node.vm.provision "shell",
+      run: "always",
+      inline: <<-SHELL
+        # Verificar si la ruta por defecto ya existe
+        if ! ip route | grep -q '^default via 172.16.1.1'; then
+          ip route add default via 172.16.1.1
+        fi
+      SHELL
   end
 
   # 3) VM en LAN: LDAP
@@ -29,6 +56,18 @@ Vagrant.configure("2") do |config|
     node.vm.network "private_network",
       ip: "172.16.1.12",
       virtualbox__intnet: "LAN"
+    # default router
+    node.vm.provision "shell",
+    run: "always",
+    inline: <<-SHELL
+      # Verificar si la ruta por defecto ya existe
+      if ! ip route | grep -q '^default via 172.16.1.1'; then
+        ip route add default via 172.16.1.1
+      fi
+    SHELL
+    node.vm.provider "virtualbox" do |vb|
+      vb.name = "LDAP" 
+    end
   end
 
   # 4) VM en LAN: CI/CD (Jenkins)
@@ -37,39 +76,44 @@ Vagrant.configure("2") do |config|
     node.vm.network "private_network",
       ip: "172.16.1.10",
       virtualbox__intnet: "LAN"
-  
+    # default router
+    node.vm.provision "shell",
+    run: "always",
+    inline: <<-SHELL
+      # Verificar si la ruta por defecto ya existe
+      if ! ip route | grep -q '^default via 172.16.1.1'; then
+        ip route add default via 172.16.1.1
+      fi
+    SHELL
     node.vm.provider "virtualbox" do |vb|
+      vb.name = "CI-CD"
       vb.memory = 2048
       vb.gui    = false
     end
 
-    config.vm.synced_folder ".", "/vagrant/despliegue-cajacelia", type: "virtualbox"
+    node.vm.synced_folder ".", "/vagrant", type: "virtualbox"
       
     node.vm.provision "ansible_local" do |ansible|
-      ansible.playbook = "/vagrant/despliegue-cajacelia/site.yml"
-      ansible.inventory_path = "/vagrant/despliegue-cajacelia/inventory/inventory"
+      ansible.playbook = "/vagrant/site.yml"
+      ansible.inventory_path = "/vagrant/inventory/inventory"
+      ansible.provisioning_path = "/vagrant"
+      ansible.limit = "all"
       ansible.verbose = true
     end
   end
 
-  # # 5) Ansible
-  # config.vm.provision "ansible" do |ansible|
-  #   ansible.playbook = "site.yml"
-  #   # ansible.groups = {
-  #   #   "testclients" => ["testclient3"]
-  #   # }
-  # end
-
   # 6) VM Cliente Ubuntu Desktop (LAN, DHCP)
   config.vm.define "client" do |node|
-    node.vm.box = "ubuntu/jammy64"
+    node.vm.box = "gusztavvargadr/ubuntu-desktop-2004-lts-xfce"
+    node.vm.box_version = "2004.0.2503"
     node.vm.hostname = "client"
     node.vm.network "private_network",
       type: "dhcp",
       virtualbox__intnet: "LAN"
+    
     node.vm.provider "virtualbox" do |vb|
-      vb.gui    = true
-      vb.memory = 2048
+      vb.name = "Client"
+      vb.gui = false
     end
   end
 end
