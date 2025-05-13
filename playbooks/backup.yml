@@ -1,0 +1,62 @@
+---
+- name: Backup diario en CI-CD
+  hosts: ci-cd
+  become: true
+  vars:
+    # Directorios a respaldar
+    backup_sources:
+      - /etc/jenkins
+      - /var/lib/jenkins
+    # Directorio donde se almacenan los backups
+    backup_dest: /var/backups/jenkins
+    # Retener solo los últimos N backups
+    backup_retention: 7
+
+  tasks:
+    - name: Crear carpeta de backup si no existe
+      file:
+        path: "{{ backup_dest }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Generar nombre de archivo con fecha
+      set_fact:
+        backup_file: "{{ backup_dest }}/jenkins-{{ lookup('pipe','date +%Y%m%d-%H%M%S') }}.tar.gz"
+
+    - name: Empaquetar directorios de Jenkins
+      archive:
+        path: "{{ backup_sources }}"
+        dest: "{{ backup_file }}"
+        format: gz
+      register: archive_result
+
+    - name: Mostrar resultado del empaquetado
+      debug:
+        msg: "Backup creado en {{ backup_file }} ({{ archive_result.archive_size }} bytes)"
+
+    - name: Listar backups existentes ordenados por fecha
+      find:
+        paths: "{{ backup_dest }}"
+        patterns: "jenkins-*.tar.gz"
+        age: 1d
+        recurse: no
+      register: found_backups
+
+    - name: Ordenar lista de backups por nombre (más antiguos primero)
+      set_fact:
+        sorted_backups: "{{ found_backups.files | sort(attribute='path') }}"
+
+    - name: Eliminar backups antiguos
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ sorted_backups[0: (sorted_backups|length - backup_retention)] }}"
+      when: sorted_backups | length > backup_retention
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Mostrar backups retenidos
+      debug:
+        msg: "{{ (sorted_backups | map(attribute='path') | list)[-backup_retention:] }}"

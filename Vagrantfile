@@ -6,10 +6,16 @@ Vagrant.configure("2") do |config|
   # Genera una clave SSH distinta para cada VM (mejor seguridad)
   config.ssh.insert_key = true
   # Configuramos el DNS
-  config.vm.provision "shell", inline: <<-SHELL
-    echo "nameserver 1.1.1.1" > /etc/resolv.conf
-    echo "nameserver 149.112.112.112" >> /etc/resolv.conf
-  SHELL
+  # ① Always set our custom DNS in systemd-resolved
+#   config.vm.provision "shell", run: "always", inline: <<-SHELL
+#     sudo mkdir -p /etc/systemd/resolved.conf.d
+#     cat <<EOF | sudo tee /etc/systemd/resolved.conf.d/10-custom-dns.conf
+#     [Resolve]
+#     DNS=9.9.9.9 149.112.112.112
+#     FallbackDNS=1.1.1.1 8.8.8.8
+# EOF
+#     sudo systemctl restart systemd-resolved
+#   SHELL
 
 
   # 1) VM en DMZ: webserver
@@ -95,6 +101,7 @@ Vagrant.configure("2") do |config|
       
     node.vm.provision "ansible_local" do |ansible|
       ansible.playbook = "/vagrant/site.yml"
+      ansible.raw_arguments = ["--timeout=60"]
       ansible.inventory_path = "/vagrant/inventory/inventory"
       ansible.provisioning_path = "/vagrant"
       ansible.limit = "all"
@@ -113,6 +120,7 @@ Vagrant.configure("2") do |config|
     
     node.vm.provider "virtualbox" do |vb|
       vb.name = "Client"
+      vb.memory = 2048
       vb.gui = false
     end
   end

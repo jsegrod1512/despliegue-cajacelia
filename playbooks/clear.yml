@@ -1,0 +1,48 @@
+---
+- name: Limpieza de APT en sistemas Debian/Ubuntu
+  hosts: all
+  become: true
+
+  vars:
+    # Tiempo máximo (en segundos) para considerar válida la caché de apt
+    apt_cache_valid_time: 3600
+
+  tasks:
+    - name: Actualizar caché de APT si es necesario
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: "{{ apt_cache_valid_time }}"
+
+    # Aquí irían tus tareas de instalación y configuración…
+    # - name: Instalar paquete X
+    #   ansible.builtin.apt:
+    #     name: "{{ item }}"
+    #     state: present
+    #   loop:
+    #     - nginx
+    #     - curl
+
+    - name: Eliminar paquetes huérfanos (autoremove)
+      ansible.builtin.apt:
+        autoremove: yes
+      when: ansible_facts['pkg_mgr'] == 'apt'  # opción segura si manejas varios sistemas
+      register: removed_packages
+
+    - name: Mostrar qué paquetes se han eliminado
+      ansible.builtin.debug:
+        msg: "Se han eliminado paquetes: {{ removed_packages.stdout_lines }}"
+      when: removed_packages is defined
+
+    - name: Limpiar caché de paquetes APT (autoclean)
+      ansible.builtin.apt:
+        autoclean: yes
+      when: ansible_facts['pkg_mgr'] == 'apt'
+
+    - name: Comprobar espacio en repositorios APT (post-limpieza)
+      ansible.builtin.shell: df -h /var/cache/apt/archives
+      register: cache_space
+      changed_when: false
+
+    - name: Mostrar uso de espacio tras limpieza
+      ansible.builtin.debug:
+        msg: "{{ cache_space.stdout_lines }}"
