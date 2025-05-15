@@ -1,7 +1,9 @@
 ---
 - import_playbook: playbooks/webserver.yml
 - import_playbook: playbooks/database.yml
+- import_playbook: playbooks/deploy_database.yml
 - import_playbook: playbooks/ldap.yml
+- import_playbook: playbooks/deploy_ldap.yml
 - import_playbook: playbooks/jenkins.yml
 - import_playbook: playbooks/clear.yml
 - import_playbook: playbooks/backup.yml

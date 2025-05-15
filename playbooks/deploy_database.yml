@@ -1,0 +1,30 @@
+---
+- name: Playbook para instalar la pila LAMP en el Backend
+  hosts: database
+  become: yes
+
+  vars_files:
+    - ../vars/variables.yml
+
+  tasks:
+
+    - name: Borrar la base de datos si existe
+      mysql_db:
+        name: "{{ db.name }}"
+        state: absent
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Crear una base de datos
+      mysql_db:
+        name: "{{ db.name }}"
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock 
+
+    - name: Crear el usuario de la base de datos
+      mysql_user:         
+        name: "{{ db.user }}"
+        password: "{{ db.password }}"
+        priv: "{{ db.name }}.*:ALL"
+        host: "%"
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock 

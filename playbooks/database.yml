@@ -1,7 +1,7 @@
 ---
-- name: Instalar y configurar MySQL en los servidores de base de datos
+- name: Playbook para instalar la pila LAMP en el Backend
   hosts: database
-  become: true
+  become: yes
 
   vars_files:
     - ../vars/variables.yml

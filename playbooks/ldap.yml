@@ -1,15 +1,15 @@
 ---
-- name: Desplegar OpenLDAP en los servidores de autenticación
+- name: Instalar y configurar OpenLDAP
   hosts: ldap
   become: true
 
   vars:
-    ldap_domain: "cajacelia.es"
-    ldap_organization: "CajaCelia"
-    ldap_admin_password: "OtroPasswordSeguro"   # Mejor en vault
+    ldap_domain:        cajacelia.es
+    ldap_root_password: OtroPasswordSeguro
+    ldap_organization:  CajaCelia
 
   tasks:
-    - name: Instalar OpenLDAP y utilidades
+    - name: Instalar paquetes slapd y ldap-utils
       apt:
         name:
           - slapd
@@ -17,22 +17,26 @@
         state: present
         update_cache: yes
 
-    - name: Reconfigurar slapd en modo no interactivo
+    - name: Preseed slapd para configuración no interactiva
       debconf:
         name: slapd
         question: "{{ item.question }}"
-        vtype: "{{ item.vtype }}"
-        value: "{{ item.value }}"
+        vtype:    "{{ item.vtype }}"
+        value:    "{{ item.value }}"
       loop:
-        - { question: "slapd/password1", vtype: "password", value: "{{ ldap_admin_password }}" }
-        - { question: "slapd/password2", vtype: "password", value: "{{ ldap_admin_password }}" }
-        - { question: "slapd/domain",      vtype: "string",   value: "{{ ldap_domain }}" }
-        - { question: "slapd/organization",vtype: "string",   value: "{{ ldap_organization }}" }
+        - { question: "slapd/internal/adminpw",     vtype: "password", value: "{{ ldap_root_password }}" }
+        - { question: "slapd/internal/generated_adminpw", vtype: "password", value: "{{ ldap_root_password }}" }
+        - { question: "slapd/password1",            vtype: "password", value: "{{ ldap_root_password }}" }
+        - { question: "slapd/password2",            vtype: "password", value: "{{ ldap_root_password }}" }
+        - { question: "slapd/domain",               vtype: "string",   value: "{{ ldap_domain }}" }
+        - { question: "slapd/organization",         vtype: "string",   value: "{{ ldap_organization }}" }
 
-    - name: Reconfigurar slapd
+    - name: Reconfigurar slapd sin interacción
       command: dpkg-reconfigure -f noninteractive slapd
+      args:
+        creates: /etc/ldap/slapd.d/cn=config.ldif
 
-    - name: Asegurar que slapd está arrancado y habilitado
+    - name: Asegurar que slapd está iniciado y habilitado
       service:
         name: slapd
         state: started

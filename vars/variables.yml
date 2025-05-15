@@ -1,2 +1,17 @@
 ip: 
     backend: 172.16.1.11
+
+# MySQL
+mysql_root_pass: "RootMySQLPass"           # contraseña del root de MySQL
+
+db:
+  host: 172.16.1.11        # IP del servidor MySQL/MariaDB
+  name: ldap              # Nombre de la base de datos LDAP
+  user: ldapbind          # Usuario con permisos sobre esa BD
+  password: BindPassSeguro    # Contraseña de ese usuario
+
+ldap:
+  admin_pass: OtroPasswordSeguro  # Contraseña del admin LDAP
+  domain: cajacelia.es        # Dominio LDAP
+
+

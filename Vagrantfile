@@ -5,18 +5,6 @@ Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/focal64"
   # Genera una clave SSH distinta para cada VM (mejor seguridad)
   config.ssh.insert_key = true
-  # Configuramos el DNS
-  # ① Always set our custom DNS in systemd-resolved
-#   config.vm.provision "shell", run: "always", inline: <<-SHELL
-#     sudo mkdir -p /etc/systemd/resolved.conf.d
-#     cat <<EOF | sudo tee /etc/systemd/resolved.conf.d/10-custom-dns.conf
-#     [Resolve]
-#     DNS=9.9.9.9 149.112.112.112
-#     FallbackDNS=1.1.1.1 8.8.8.8
-# EOF
-#     sudo systemctl restart systemd-resolved
-#   SHELL
-
 
   # 1) VM en DMZ: webserver
   config.vm.define "webserver" do |node|
@@ -54,6 +42,10 @@ Vagrant.configure("2") do |config|
           ip route add default via 172.16.1.1
         fi
       SHELL
+    node.vm.provider "virtualbox" do |vb|
+      vb.name = "Database"
+      vb.memory = 1024
+    end
   end
 
   # 3) VM en LAN: LDAP
@@ -72,7 +64,8 @@ Vagrant.configure("2") do |config|
       fi
     SHELL
     node.vm.provider "virtualbox" do |vb|
-      vb.name = "LDAP" 
+      vb.name = "LDAP"
+      vb.memory = 1024
     end
   end
 
@@ -94,14 +87,13 @@ Vagrant.configure("2") do |config|
     node.vm.provider "virtualbox" do |vb|
       vb.name = "CI-CD"
       vb.memory = 2048
-      vb.gui    = false
     end
 
     node.vm.synced_folder ".", "/vagrant", type: "virtualbox"
       
     node.vm.provision "ansible_local" do |ansible|
       ansible.playbook = "/vagrant/site.yml"
-      ansible.raw_arguments = ["--timeout=60"]
+      ansible.raw_arguments = ["--timeout=120"]
       ansible.inventory_path = "/vagrant/inventory/inventory"
       ansible.provisioning_path = "/vagrant"
       ansible.limit = "all"
@@ -121,7 +113,7 @@ Vagrant.configure("2") do |config|
     node.vm.provider "virtualbox" do |vb|
       vb.name = "Client"
       vb.memory = 2048
-      vb.gui = false
+      vb.gui = true
     end
   end
 end

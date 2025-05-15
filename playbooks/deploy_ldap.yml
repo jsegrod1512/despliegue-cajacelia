@@ -1,0 +1,81 @@
+---
+- name: Crear OU y grupos de roles en OpenLDAP
+  hosts: ldap
+  become: true
+
+  vars:
+    ldap_domain:        cajacelia.es
+    ldap_root_password: OtroPasswordSeguro
+
+    # DN raíz de administración
+    bind_dn: "cn=admin,dc={{ ldap_domain.replace('.',',dc=') }}"
+    bind_pw: "{{ ldap_root_password }}"
+    base_dn: "dc={{ ldap_domain.replace('.',',dc=') }}"
+
+  tasks:
+    - name: Crear contenedor Groups
+      community.general.ldap_entry:
+        dn: "ou=Groups,{{ base_dn }}"
+        objectClass:
+          - organizationalUnit
+        attributes:
+          ou: Groups
+        state: present
+        bind_dn: "{{ bind_dn }}"
+        bind_pw: "{{ bind_pw }}"
+        url: ldap://localhost
+
+    - name: Crear contenedor People
+      community.general.ldap_entry:
+        dn: "ou=People,{{ base_dn }}"
+        objectClass:
+          - organizationalUnit
+        attributes:
+          ou: People
+        state: present
+        bind_dn: "{{ bind_dn }}"
+        bind_pw: "{{ bind_pw }}"
+        url: ldap://localhost
+
+    - name: Crear grupo Administradores
+      community.general.ldap_entry:
+        dn: "cn=Administradores,ou=Groups,{{ base_dn }}"
+        objectClass:
+          - top
+          - groupOfNames
+        attributes:
+          cn: Administradores
+          member:
+            - "{{ bind_dn }}"
+        state: present
+        bind_dn: "{{ bind_dn }}"
+        bind_pw: "{{ bind_pw }}"
+        url: ldap://localhost
+
+    - name: Crear grupo Desarrolladores
+      community.general.ldap_entry:
+        dn: "cn=Desarrolladores,ou=Groups,{{ base_dn }}"
+        objectClass:
+          - top
+          - groupOfNames
+        attributes:
+          cn: Desarrolladores
+          member: []
+        state: present
+        bind_dn: "{{ bind_dn }}"
+        bind_pw: "{{ bind_pw }}"
+        url: ldap://localhost
+
+    - name: Crear grupo Clientes
+      community.general.ldap_entry:
+        dn: "cn=Clientes,ou=Groups,{{ base_dn }}"
+        objectClass:
+          - top
+          - groupOfNames
+        attributes:
+          cn: Clientes
+          member: []
+        state: present
+        bind_dn: "{{ bind_dn }}"
+        bind_pw: "{{ bind_pw }}"
+        url: ldap://localhost

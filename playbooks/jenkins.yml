@@ -1,58 +1,65 @@
 ---
-- name: Instalar y configurar Jenkins en el servidor CI-CD
+- name: Instalar Jenkins LTS en CI-CD
   hosts: ci-cd
   become: true
 
   vars:
+    # URL del repositorio LTS estable
     jenkins_repo_url: "https://pkg.jenkins.io/debian-stable"
-    jenkins_repo_key_url: "https://pkg.jenkins.io/debian-stable/jenkins.io.key"
+    # Clave LTS nueva (abril 2023)
+    jenkins_key_url: "{{ jenkins_repo_url }}/jenkins.io-2023.key"
+    keyring_path: "/usr/share/keyrings/jenkins-jenkins.io-2023.gpg"
 
   tasks:
-    - name: Instalar dependencias base (Java, curl, gnupg)
+    - name: Instalar dependencias necesarias para añadir repositorios HTTPS
       apt:
         name:
-          - openjdk-11-jdk
+          - openjdk-17-jdk
+          - ca-certificates
           - curl
           - gnupg
         state: present
         update_cache: yes
 
-    - name: Añadir clave GPG de Jenkins
-      apt_key:
-        url: "{{ jenkins_repo_key_url }}"
-        state: present
+    - name: Descargar la nueva clave GPG de Jenkins LTS
+      ansible.builtin.get_url:
+        url: "{{ jenkins_key_url }}"
+        dest: "/tmp/jenkins-lts.key"
+        mode: '0644'
+      register: gpg_fetch
 
-    - name: Añadir repositorio de Jenkins
+    - name: Convertir la clave a formato dearmored y guardarla en keyrings
+      command:
+        cmd: >
+          gpg --dearmor
+          --yes
+          --output "{{ keyring_path }}"
+          "/tmp/jenkins-lts.key"
+      args:
+        creates: "{{ keyring_path }}"
+      when: gpg_fetch.changed
+
+    - name: Eliminar el fichero temporal de clave
+      file:
+        path: "/tmp/jenkins-lts.key"
+        state: absent
+
+    - name: Añadir el repositorio de Jenkins LTS con signed-by
       apt_repository:
-        repo: "deb {{ jenkins_repo_url }} binary/"
+        repo: "deb [signed-by={{ keyring_path }}] {{ jenkins_repo_url }} binary/"
         state: present
 
-    - name: Actualizar caché de APT tras añadir Jenkins repo
+    - name: Actualizar caché de APT
       apt:
         update_cache: yes
 
-    - name: Instalar Jenkins
+    - name: Instalar o actualizar Jenkins
       apt:
         name: jenkins
         state: latest
 
-    - name: Asegurar que el servicio Jenkins está habilitado y en marcha
+    - name: Asegurar que el servicio Jenkins esté habilitado y en marcha
       service:
         name: jenkins
         state: started
         enabled: yes
-
-    - name: Esperar a que Jenkins esté escuchando en el puerto 8080
-      wait_for:
-        host: "127.0.0.1"
-        port: 8080
-        timeout: 120
-
-    - name: Mostrar la contraseña inicial de Jenkins
-      shell: "cat /var/lib/jenkins/secrets/initialAdminPassword"
-      register: jenkins_password
-      changed_when: false
-
-    - name: Mostrar en pantalla la contraseña inicial de Jenkins
-      debug:
-        msg: "La contraseña inicial de Jenkins es: {{ jenkins_password.stdout }}"

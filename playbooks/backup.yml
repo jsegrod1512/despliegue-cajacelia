@@ -32,9 +32,14 @@
         format: gz
       register: archive_result
 
+    - name: Obtener información del archivo de backup
+      stat:
+        path: "{{ backup_file }}"
+      register: backup_stat
+
     - name: Mostrar resultado del empaquetado
       debug:
-        msg: "Backup creado en {{ backup_file }} ({{ archive_result.archive_size }} bytes)"
+        msg: "Backup creado en {{ backup_file }} ({{ backup_stat.stat.size }} bytes)"
 
     - name: Listar backups existentes ordenados por fecha
       find:
