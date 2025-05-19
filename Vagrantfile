@@ -93,7 +93,7 @@ Vagrant.configure("2") do |config|
       
     node.vm.provision "ansible_local" do |ansible|
       ansible.playbook = "/vagrant/site.yml"
-      ansible.raw_arguments = ["--timeout=120"]
+      ansible.raw_arguments = ["--timeout=400"]
       ansible.inventory_path = "/vagrant/inventory/inventory"
       ansible.provisioning_path = "/vagrant"
       ansible.limit = "all"

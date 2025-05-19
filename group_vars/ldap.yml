@@ -1,0 +1,5 @@
+ldap_domain:       cajacelia.es
+ldap_organization: CajaCelia
+ldap_root_dn:      "cn=admin,dc=cajacelia,dc=es"
+ldap_root_pass:    "OtroPasswordSeguro"
+base_dn:           "dc=cajacelia,dc=es"

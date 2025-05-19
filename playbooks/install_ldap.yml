@@ -1,0 +1,56 @@
+---
+- name: Instalar OpenLDAP desde cero
+  hosts: ldap
+  become: true
+
+  vars_files:
+    - ../group_vars/ldap.yml   # Define: ldap_domain, ldap_root_pass, ldap_organization
+
+  tasks:
+
+    - name: Detener slapd si está corriendo
+      service:
+        name: slapd
+        state: stopped
+      ignore_errors: yes
+
+    - name: Borrar configuración y datos antiguos de slapd
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/ldap/slapd.d
+        - /var/lib/ldap
+
+    - name: Instalar slapd y ldap-utils
+      apt:
+        name:
+          - slapd
+          - ldap-utils
+        state: present
+        update_cache: yes
+
+    - name: Preseed de slapd (no interactivo)
+      debconf:
+        name: slapd
+        question: "{{ item.question }}"
+        vtype:    "{{ item.vtype }}"
+        value:    "{{ item.value }}"
+      loop:
+        - { question: "slapd/internal/adminpw",            vtype: "password", value: "{{ ldap_root_pass }}" }
+        - { question: "slapd/internal/generated_adminpw",  vtype: "password", value: "{{ ldap_root_pass }}" }
+        - { question: "slapd/password1",                    vtype: "password", value: "{{ ldap_root_pass }}" }
+        - { question: "slapd/password2",                    vtype: "password", value: "{{ ldap_root_pass }}" }
+        - { question: "slapd/domain",                       vtype: "string",   value: "{{ ldap_domain }}" }
+        - { question: "slapd/organization",                 vtype: "string",   value: "{{ ldap_organization }}" }
+
+    - name: Reconfigurar slapd sin interacción
+      command: dpkg-reconfigure -f noninteractive slapd
+      args:
+        creates: /etc/ldap/slapd.d/cn=config.ldif
+
+    - name: Arrancar y habilitar slapd
+      service:
+        name: slapd
+        state: started
+        enabled: yes

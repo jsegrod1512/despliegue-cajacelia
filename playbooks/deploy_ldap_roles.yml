@@ -1,0 +1,63 @@
+---
+- name: Desplegar OU y grupos en OpenLDAP
+  hosts: ldap
+  become: true
+
+  vars_files:
+    - ../group_vars/ldap.yml   # Define: ldap_root_dn, ldap_root_pass, base_dn
+
+  tasks:
+    - name: Forzar Python 3 para ldap_entry
+      set_fact:
+        ansible_python_interpreter: /usr/bin/python3
+
+    - name: Instalar python3-ldap
+      apt:
+        name: python3-ldap
+        update_cache: yes
+        state: present
+
+    - name: Crear OU People
+      community.general.ldap_entry:
+        dn: "ou=People,{{ base_dn }}"
+        objectClass:
+          - organizationalUnit
+        attributes:
+          ou: People
+        state: present
+        bind_dn:    "{{ ldap_root_dn }}"
+        bind_pw:    "{{ ldap_root_pass }}"
+        server_uri: ldap://localhost
+
+    - name: Crear OU Groups
+      community.general.ldap_entry:
+        dn: "ou=Groups,{{ base_dn }}"
+        objectClass:
+          - organizationalUnit
+        attributes:
+          ou: Groups
+        state: present
+        bind_dn:    "{{ ldap_root_dn }}"
+        bind_pw:    "{{ ldap_root_pass }}"
+        server_uri: ldap://localhost
+
+    - name: Crear grupos base
+      loop:
+        - Administradores
+        - Desarrolladores
+        - Clientes
+      community.general.ldap_entry:
+        dn: "cn={{ item }},ou=Groups,{{ base_dn }}"
+        objectClass:
+          - top
+          - groupOfNames
+        attributes:
+          cn:     "{{ item }}"
+          member:
+            - "{{ ldap_root_dn }}"
+        state: present
+        bind_dn:    "{{ ldap_root_dn }}"
+        bind_pw:    "{{ ldap_root_pass }}"
+        server_uri: ldap://localhost
+      loop_control:
+        label: "Grupo {{ item }}"

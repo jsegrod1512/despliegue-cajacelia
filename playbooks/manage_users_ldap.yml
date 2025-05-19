@@ -1,0 +1,58 @@
+---
+- name: Crear usuarios y añadirlos a sus grupos en OpenLDAP
+  hosts: ldap
+  become: true
+
+  vars_files:
+    - ../group_vars/ldap.yml    # ldap_root_dn, ldap_root_pass, base_dn
+    - ../users/users.yml        # users: [{ uid, cn, sn, password, groups: [...] }, ...]
+
+  tasks:
+    - name: Forzar Python 3 en el controlador LDAP
+      set_fact:
+        ansible_python_interpreter: /usr/bin/python3
+
+    - name: Instalar python3-ldap
+      apt:
+        name: python3-ldap
+        update_cache: yes
+        state: present
+
+    - name: Crear cada usuario en ou=People
+      community.general.ldap_entry:
+        dn: "uid={{ item.uid }},ou=People,{{ base_dn }}"
+        objectClass:
+          - inetOrgPerson
+        attributes:
+          cn:           "{{ item.cn }}"
+          sn:           "{{ item.sn }}"
+          uid:          "{{ item.uid }}"
+          userPassword: "{{ item.password }}"
+        state: present
+        bind_dn:    "{{ ldap_root_dn }}"
+        bind_pw:    "{{ ldap_root_pass }}"
+        server_uri: ldap://localhost
+      loop: "{{ users }}"
+      loop_control:
+        label: "{{ item.uid }}"
+
+    - name: Añadir cada usuario a sus grupos existentes
+      community.general.ldap_entry:
+        dn: "cn={{ group }},ou=Groups,{{ base_dn }}"
+        objectClass:
+          - top
+          - groupOfNames
+        attributes:
+          member: "uid={{ user.uid }},ou=People,{{ base_dn }}"
+        state: present                               # ← cambiar aquí
+        bind_dn:    "{{ ldap_root_dn }}"
+        bind_pw:    "{{ ldap_root_pass }}"
+        server_uri: ldap://localhost
+      vars:
+        user:  "{{ item.0 }}"
+        group: "{{ item.1 }}"
+      with_subelements:
+        - "{{ users }}"
+        - groups
+      loop_control:
+        label: "{{ user.uid }} → {{ group }}"

@@ -1,0 +1,14 @@
+users:
+  - uid: dev1
+    cn: "Dev One"
+    sn: "One"
+    password: "devpass1"
+    groups:
+      - Desarrolladores
+
+  - uid: cliente1
+    cn: "Cliente Uno"
+    sn: "Uno"
+    password: "clientepass1"
+    groups:
+      - Clientes
