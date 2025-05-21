@@ -1,8 +1,10 @@
 Vagrant.configure("2") do |config|
   # Deshabilita el montaje automático de /vagrant en todas las VMs
   config.vm.synced_folder ".", "/vagrant", disabled: true
-  # Usa Ubuntu Server LTS por defectoz
+
+  # Usa Ubuntu Server LTS por defecto
   config.vm.box = "ubuntu/focal64"
+  
   # Genera una clave SSH distinta para cada VM (mejor seguridad)
   config.ssh.insert_key = true
 
@@ -11,7 +13,7 @@ Vagrant.configure("2") do |config|
     node.vm.hostname = "webserver"
     node.vm.network "private_network",
       ip: "10.1.0.10",
-      virtualbox__intnet: "DMZ"      # internal network DMZ :contentReference[oaicite:0]{index=0}
+      virtualbox__intnet: "DMZ"      # internal network DMZ 
     # default router
     node.vm.provision "shell",
       run: "always",
@@ -69,7 +71,22 @@ Vagrant.configure("2") do |config|
     end
   end
 
-  # 4) VM en LAN: CI/CD (Jenkins)
+  # 4) VM Cliente Ubuntu Desktop (LAN, DHCP)
+  config.vm.define "client" do |node|
+    node.vm.box = "gusztavvargadr/ubuntu-desktop-2004-lts-xfce"
+    node.vm.box_version = "2004.0.2503"
+    node.vm.hostname = "client"
+    node.vm.network "private_network",
+      type: "dhcp",
+      virtualbox__intnet: "LAN"
+    node.vm.provider "virtualbox" do |vb|
+      vb.name = "Client"
+      vb.memory = 2048
+      vb.gui = true
+    end
+  end
+
+  # 5) VM en LAN: CI/CD (Jenkins)
   config.vm.define "ci-cd" do |node|
     node.vm.hostname = "ci-cd"
     node.vm.network "private_network",
@@ -94,26 +111,11 @@ Vagrant.configure("2") do |config|
     node.vm.provision "ansible_local" do |ansible|
       ansible.playbook = "/vagrant/site.yml"
       ansible.raw_arguments = ["--timeout=400"]
-      ansible.inventory_path = "/vagrant/inventory/inventory"
+      # ansible.inventory_path   = "/vagrant/inventory"
+      ansible.inventory_path = "/vagrant/inventory"
       ansible.provisioning_path = "/vagrant"
       ansible.limit = "all"
       ansible.verbose = true
-    end
-  end
-
-  # 6) VM Cliente Ubuntu Desktop (LAN, DHCP)
-  config.vm.define "client" do |node|
-    node.vm.box = "gusztavvargadr/ubuntu-desktop-2004-lts-xfce"
-    node.vm.box_version = "2004.0.2503"
-    node.vm.hostname = "client"
-    node.vm.network "private_network",
-      type: "dhcp",
-      virtualbox__intnet: "LAN"
-    
-    node.vm.provider "virtualbox" do |vb|
-      vb.name = "Client"
-      vb.memory = 2048
-      vb.gui = true
     end
   end
 end
