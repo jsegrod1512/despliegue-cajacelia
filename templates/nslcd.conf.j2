@@ -1,0 +1,10 @@
+# Archivo generado por Ansible
+uri {{ ldap_uri }}
+base dc={{ ldap_domain.split('.')|join(',dc=') }}
+binddn {{ ldap_root_dn }}
+bindpw {{ ldap_root_pass }}
+scope sub
+# Opcionales:
+# timelimit 30
+# timelimit soft
+# idle timelimit 3600

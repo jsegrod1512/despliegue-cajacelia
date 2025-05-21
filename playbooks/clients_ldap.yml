@@ -1,63 +1,55 @@
----
-- name: Configurar clientes Linux para autenticarse contra OpenLDAP
+- name: Configurar clientes LDAP con nslcd
   hosts: clients
-  become: true
-  vars:
-    ldap_uri: "ldap://172.16.1.12"
-    ldap_base: "dc=cajacelia,dc=es"
-    ldap_bind_dn: "cn=admin,dc=cajacelia,dc=es"
-    ldap_bind_pw: "OtroPasswordSeguro"
+  become: yes
+  vars_files:
+    - ../users/users.yml   # si necesitas aprovisionar usuarios locales o pruebas
   tasks:
-    - name: Instalar SSSD, NSS/PAM y utilidades LDAP
+    - name: Instalar paquetes necesarios
       apt:
         name:
-          - sssd
-          - libnss-sss
-          - libpam-sss
+          - nslcd
+          - libnss-ldapd
           - ldap-utils
+          - nscd
+          - libpam-ldapd
         state: present
         update_cache: yes
 
-    - name: Copiar fichero de configuración sssd.conf
+    - name: Deshabilitar configuración interactiva de libpam-ldapd
+      debconf:
+        name: libpam-ldapd
+        question: "pam/ldapns/ldap-server"
+        value: "{{ ldap_uri }}"
+        vtype: string
+
+    - name: Crear configuración de nslcd
       template:
-        src: ../templates/sssd.conf.j2
-        dest: /etc/sssd/sssd.conf
+        src: ../templates/nslcd.conf.j2
+        dest: /etc/nslcd.conf
         owner: root
         group: root
-        mode: 0600
+        mode: '0600'
 
-    - name: Configurar nsswitch para usar sss
-      lineinfile:
-        path: /etc/nsswitch.conf
-        regexp: '^passwd:'
-        line: 'passwd:         files sss'
-        backup: yes
-      notify: restart sssd
+    - name: Configurar nsswitch para usar LDAP
+      template:
+        src: ../templates/nsswitch.conf.j2
+        dest: /etc/nsswitch.conf
+        owner: root
+        group: root
+        mode: '0644'
 
-    - name: Configurar group en nsswitch
-      lineinfile:
-        path: /etc/nsswitch.conf
-        regexp: '^group:'
-        line: 'group:          files sss'
-        backup: yes
-      notify: restart sssd
+    - name: Configurar PAM para cuentas LDAP
+      template:
+        src: ../templates/common-account.j2
+        dest: /etc/pam.d/common-account
+        owner: root
+        group: root
+        mode: '0644'
 
-    - name: Configurar shadow en nsswitch
-      lineinfile:
-        path: /etc/nsswitch.conf
-        regexp: '^shadow:'
-        line: 'shadow:         files sss'
-        backup: yes
-      notify: restart sssd
-
-    - name: Asegurar que SSSD arranca al inicio
+    - name: Reiniciar servicios nslcd, nscd
       service:
-        name: sssd
-        state: started
-        enabled: yes
-
-  handlers:
-    - name: restart sssd
-      service:
-        name: sssd
+        name: "{{ item }}"
         state: restarted
+      loop:
+        - nslcd
+        - nscd

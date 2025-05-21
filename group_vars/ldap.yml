@@ -1,3 +1,4 @@
+ldap_uri:    "ldap://172.16.1.12"
 ldap_domain:       cajacelia.es
 ldap_organization: CajaCelia
 ldap_root_dn:      "cn=admin,dc=cajacelia,dc=es"
