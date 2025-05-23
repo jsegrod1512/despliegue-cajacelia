@@ -5,6 +5,10 @@ users:
     password: "devpass1"
     groups:
       - Desarrolladores
+    uidNumber: 20001
+    gidNumber: 10001
+    homeDirectory: "/home/dev1"
+    loginShell: "/bin/bash"
 
   - uid: cliente1
     cn: "Cliente Uno"
@@ -12,3 +16,7 @@ users:
     password: "clientepass1"
     groups:
       - Clientes
+    uidNumber: 20002
+    gidNumber: 10002
+    homeDirectory: "/home/cliente1"
+    loginShell: "/bin/bash"

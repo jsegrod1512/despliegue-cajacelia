@@ -1,28 +1,10 @@
----
-- name: Instalar OpenLDAP desde cero
+- name: Configurar Servidor LDAP
   hosts: ldap
   become: true
-
   vars_files:
-    - ../group_vars/ldap.yml   # Define: ldap_domain, ldap_root_pass, ldap_organization
-
+    - ../group_vars/ldap.yml
   tasks:
-
-    - name: Detener slapd si está corriendo
-      service:
-        name: slapd
-        state: stopped
-      ignore_errors: yes
-
-    - name: Borrar configuración y datos antiguos de slapd
-      file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - /etc/ldap/slapd.d
-        - /var/lib/ldap
-
-    - name: Instalar slapd y ldap-utils
+    - name: Instalar paquetes necesarios
       apt:
         name:
           - slapd
@@ -30,27 +12,55 @@
         state: present
         update_cache: yes
 
-    - name: Preseed de slapd (no interactivo)
+    - name: Configurar slapd con debconf
       debconf:
         name: slapd
         question: "{{ item.question }}"
-        vtype:    "{{ item.vtype }}"
-        value:    "{{ item.value }}"
+        value: "{{ item.value }}"
+        vtype: "{{ item.vtype }}"
       loop:
-        - { question: "slapd/internal/adminpw",            vtype: "password", value: "{{ ldap_root_pass }}" }
-        - { question: "slapd/internal/generated_adminpw",  vtype: "password", value: "{{ ldap_root_pass }}" }
-        - { question: "slapd/password1",                    vtype: "password", value: "{{ ldap_root_pass }}" }
-        - { question: "slapd/password2",                    vtype: "password", value: "{{ ldap_root_pass }}" }
-        - { question: "slapd/domain",                       vtype: "string",   value: "{{ ldap_domain }}" }
-        - { question: "slapd/organization",                 vtype: "string",   value: "{{ ldap_organization }}" }
+        - { question: "slapd/internal/generated_adminpw", value: "{{ ldap_root_pass }}", vtype: "password" }
+        - { question: "slapd/internal/adminpw", value: "{{ ldap_root_pass }}", vtype: "password" }
+        - { question: "slapd/password1", value: "{{ ldap_root_pass }}", vtype: "password" }
+        - { question: "slapd/password2", value: "{{ ldap_root_pass }}", vtype: "password" }
+        - { question: "slapd/domain", value: "{{ ldap_domain }}", vtype: "string" }
+        - { question: "slapd/backend", value: "MDB", vtype: "select" }
+        - { question: "slapd/purge_database", value: "true", vtype: "boolean" }
+        - { question: "slapd/move_old_database", value: "true", vtype: "boolean" }
+        - { question: "slapd/allow_ldap_v2", value: "false", vtype: "boolean" }
 
-    - name: Reconfigurar slapd sin interacción
+    - name: Reconfigurar slapd
       command: dpkg-reconfigure -f noninteractive slapd
-      args:
-        creates: /etc/ldap/slapd.d/cn=config.ldif
 
-    - name: Arrancar y habilitar slapd
-      service:
-        name: slapd
-        state: started
-        enabled: yes
+    - name: Crear archivo base.ldif
+      copy:
+        dest: /tmp/base.ldif
+        content: |
+          dn: {{ base_dn }}
+          objectClass: top
+          objectClass: dcObject
+          objectClass: organization
+          o: {{ ldap_organization }}
+          dc: {{ ldap_domain.split('.')[0] }}
+
+          dn: ou=People,{{ base_dn }}
+          objectClass: organizationalUnit
+          ou: People
+
+          dn: ou=Groups,{{ base_dn }}
+          objectClass: organizationalUnit
+          ou: Groups
+
+          {% for group, gid in group_gids.items() %}
+          dn: cn={{ group }},ou=Groups,{{ base_dn }}
+          objectClass: top
+          objectClass: posixGroup
+          cn: {{ group }}
+          gidNumber: {{ gid }}
+          {% endfor %}
+
+
+    - name: Añadir estructura base al LDAP
+      command: ldapadd -x -D "{{ ldap_root_dn }}" -w "{{ ldap_root_pass }}" -f /tmp/base.ldif
+      args:
+        creates: /tmp/base.ldif

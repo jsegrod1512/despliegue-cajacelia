@@ -1,58 +1,107 @@
 ---
-- name: Crear usuarios y añadirlos a sus grupos en OpenLDAP
+- name: Gestionar OUs y usuarios LDAP con contraseñas SSHA
   hosts: ldap
   become: true
-
   vars_files:
-    - ../group_vars/ldap.yml    # ldap_root_dn, ldap_root_pass, base_dn
-    - ../users/users.yml        # users: [{ uid, cn, sn, password, groups: [...] }, ...]
+    - ../group_vars/ldap.yml    # base_dn, ldap_root_dn, ldap_root_pass
+    - ../users/users.yml              # users: [...]
 
   tasks:
-    - name: Forzar Python 3 en el controlador LDAP
-      set_fact:
-        ansible_python_interpreter: /usr/bin/python3
-
-    - name: Instalar python3-ldap
+    - name: Instalar dependencias LDAP
       apt:
-        name: python3-ldap
+        name:
+          - slapd
+          - ldap-utils
+          - python3-ldap
+        state: present
         update_cache: yes
+
+    - name: Crear OU Groups si no existe
+      community.general.ldap_entry:
+        dn: "ou=Groups,{{ base_dn }}"
+        objectClass:
+          - organizationalUnit
+        attributes:
+          ou: Groups
+        bind_dn: "{{ ldap_root_dn }}"
+        bind_pw: "{{ ldap_root_pass }}"
+        server_uri: ldap://localhost
         state: present
 
-    - name: Crear cada usuario en ou=People
+    - name: Crear OU People si no existe
       community.general.ldap_entry:
-        dn: "uid={{ item.uid }},ou=People,{{ base_dn }}"
+        dn: "ou=People,{{ base_dn }}"
         objectClass:
-          - inetOrgPerson
+          - organizationalUnit
         attributes:
-          cn:           "{{ item.cn }}"
-          sn:           "{{ item.sn }}"
-          uid:          "{{ item.uid }}"
-          userPassword: "{{ item.password }}"
-        state: present
-        bind_dn:    "{{ ldap_root_dn }}"
-        bind_pw:    "{{ ldap_root_pass }}"
+          ou: People
+        bind_dn: "{{ ldap_root_dn }}"
+        bind_pw: "{{ ldap_root_pass }}"
         server_uri: ldap://localhost
+        state: present
+
+    - name: Crear/asegurar grupos posixGroup (estructura base ya los define)
+      community.general.ldap_entry:
+        dn: "cn={{ item.key }},ou=Groups,{{ base_dn }}"
+        objectClass:
+          - top
+          - posixGroup
+        attributes:
+          gidNumber: "{{ item.value }}"
+        bind_dn: "{{ ldap_root_dn }}"
+        bind_pw: "{{ ldap_root_pass }}"
+        server_uri: ldap://localhost
+        state: present
+      loop: "{{ group_gids | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Asociar usuarios a sus grupos con memberUid
+      community.general.ldap_entry:
+        dn: "cn={{ item.1 }},ou=Groups,{{ base_dn }}"
+        objectClass:
+          - top
+          - posixGroup
+        attributes:
+          gidNumber: "{{ group_gids[item.1] }}"
+          memberUid: "{{ item.0.uid }}"
+        bind_dn: "{{ ldap_root_dn }}"
+        bind_pw: "{{ ldap_root_pass }}"
+        server_uri: ldap://localhost
+        state: present
+      loop: "{{ users | subelements('groups') }}"
+      loop_control:
+        label: "{{ item.0.uid }} → {{ item.1 }}"
+
+
+    - name: Generar hashes SSHA para cada usuario
+      shell: slappasswd -s "{{ item.password }}"
       loop: "{{ users }}"
+      register: hashed_passwords
+      changed_when: false
       loop_control:
         label: "{{ item.uid }}"
 
-    - name: Añadir cada usuario a sus grupos existentes
+    - name: Crear o actualizar usuarios con posixAccount y password SSHA
       community.general.ldap_entry:
-        dn: "cn={{ group }},ou=Groups,{{ base_dn }}"
+        dn: "uid={{ item.0.uid }},ou=People,{{ base_dn }}"
         objectClass:
           - top
-          - groupOfNames
+          - inetOrgPerson
+          - posixAccount
         attributes:
-          member: "uid={{ user.uid }},ou=People,{{ base_dn }}"
-        state: present                               # ← cambiar aquí
+          cn:           "{{ item.0.cn }}"
+          sn:           "{{ item.0.sn }}"
+          uid:          "{{ item.0.uid }}"
+          uidNumber:    "{{ item.0.uidNumber }}"
+          gidNumber:    "{{ item.0.gidNumber }}"
+          homeDirectory: "{{ item.0.homeDirectory }}"
+          loginShell:   "{{ item.0.loginShell }}"
+          userPassword: "{{ item.1.stdout }}"
         bind_dn:    "{{ ldap_root_dn }}"
         bind_pw:    "{{ ldap_root_pass }}"
-        server_uri: ldap://localhost
-      vars:
-        user:  "{{ item.0 }}"
-        group: "{{ item.1 }}"
-      with_subelements:
-        - "{{ users }}"
-        - groups
+        server_uri: "{{ ldap_uri | default('ldap://localhost') }}"
+        state: present
+      loop: "{{ users | zip(hashed_passwords.results) | list }}"
       loop_control:
-        label: "{{ user.uid }} → {{ group }}"
+        label: "{{ item.0.uid }}"

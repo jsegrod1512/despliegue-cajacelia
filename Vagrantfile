@@ -73,8 +73,8 @@ Vagrant.configure("2") do |config|
 
   # 4) VM Cliente Ubuntu Desktop (LAN, DHCP)
   config.vm.define "client" do |node|
-    node.vm.box = "gusztavvargadr/ubuntu-desktop-2004-lts-xfce"
-    node.vm.box_version = "2004.0.2503"
+    node.vm.box = "gusztavvargadr/ubuntu-desktop"
+    node.vm.box_version = "2404.0.2503"
     node.vm.hostname = "client"
     node.vm.network "private_network",
       type: "dhcp",
