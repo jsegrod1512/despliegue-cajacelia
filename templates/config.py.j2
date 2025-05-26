@@ -5,6 +5,7 @@ class Config:
 
     # LDAP
     LDAP_SERVER   = "{{ ldap.uri }}"
+    LDAP_HOST = LDAP_SERVER
     LDAP_BASE_DN  = "{{ ldap.base_dn }}"
     LDAP_USER_DN  = "ou=People,{{ ldap.base_dn }}"
 
