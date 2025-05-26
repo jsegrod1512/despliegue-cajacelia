@@ -4,19 +4,16 @@ class Config:
     SECRET_KEY = "{{ flask_secret_key }}"
 
     # LDAP
-    LDAP_SERVER  = "{{ ldap.uri }}"
-    LDAP_BASE_DN = "{{ ldap.base_dn }}"
-    LDAP_USER_DN = "ou=Users,{{ ldap.base_dn }}"
+    LDAP_SERVER   = "{{ ldap.uri }}"
+    LDAP_BASE_DN  = "{{ ldap.base_dn }}"
+    LDAP_USER_DN  = "ou=Users,{{ ldap.base_dn }}"
 
-    # MySQL URI para SQLAlchemy (si la usas en algún sitio)
-    SQLALCHEMY_DATABASE_URI = (
-      "mysql+pymysql://{{ app_db.user }}:{{ app_db.password }}"
-      "@{{ app_db.host }}/{{ app_db.name }}?charset=utf8mb4"
-    )
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Credenciales de bind para búsqueda en LDAP
+    LDAP_BIND_DN  = "cn={{ ldap_admin.user }},{{ ldap.base_dn }}"
+    LDAP_BIND_PW  = "{{ ldap_admin.password }}"
 
-    # Variables individuales para db_conn()
-    DB_HOST = "{{ app_db.host }}"
-    DB_USER = "{{ app_db.user }}"
-    DB_PASS = "{{ app_db.password }}"
-    DB_NAME = "{{ app_db.name }}"
+    # MySQL
+    DB_HOST       = "{{ app_db.host }}"
+    DB_USER       = "{{ app_db.user }}"
+    DB_PASS       = "{{ app_db.password }}"
+    DB_NAME       = "{{ app_db.name }}"

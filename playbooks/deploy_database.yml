@@ -26,3 +26,20 @@
         host: "%"
         state: present
         login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Copiar plantilla de esquema SQL a la máquina de BBDD
+      template:
+        src: ../templates/app_schema.sql.j2
+        dest: /tmp/app_schema.sql
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Importar esquema de la app en MySQL usando el usuario de la app
+      community.mysql.mysql_db:
+        state: import
+        name: "{{ app_db.name }}"
+        target: /tmp/app_schema.sql
+        login_host: "{{ app_db.host }}"
+        login_user: "{{ app_db.user }}"
+        login_password: "{{ app_db.password }}"

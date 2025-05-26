@@ -20,3 +20,14 @@ users:
     gidNumber: 10002
     homeDirectory: "/home/cliente1"
     loginShell: "/bin/bash"
+
+  - uid: jsr62590
+    cn: "Jose Manuel"
+    sn: "Segura Rodriguez"
+    password: "12345"
+    groups:
+      - Clientes
+    uidNumber: 20003
+    gidNumber: 10002
+    homeDirectory: "/home/jsr62590"
+    loginShell: "/bin/bash"

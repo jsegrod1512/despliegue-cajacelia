@@ -1,31 +1,18 @@
-# group_vars/ldap.yml
-
-# ───────────────────────────────────────────────
-# Configuración general de LDAP
-# ───────────────────────────────────────────────
 ldap:
-  uri:            "ldap://172.16.1.12"
-  domain:         "cajacelia.es"
-  organization:   "CajaCelia"
-  base_dn:        "dc=cajacelia,dc=es"
+  uri:          "ldap://172.16.1.12"
+  base_dn:      "dc=cajacelia,dc=es"
+  domain:       "cajacelia.es"
+  organization: "CajaCelia"
 
-# ───────────────────────────────────────────────
-# Credenciales de administración
-# ───────────────────────────────────────────────
-ldap_admin:
-  user:           "admin"
-  bind_dn:        "cn={{ ldap_admin.user }},{{ ldap.base_dn }}"
-  # Mueve este valor a Vault para mayor seguridad
-  password:       "{{ vault_ldap_root_pass }}"
-
-# ───────────────────────────────────────────────
-# Definición de grupos y GID mappings
-# ───────────────────────────────────────────────
 ldap_groups:
   Desarrolladores: 10001
   Clientes:        10002
 
-# ───────────────────────────────────────────────
-# Variables sensibles (defínelas con Ansible Vault)
-# ───────────────────────────────────────────────
+ldap_admin_user: "admin"
+ldap_admin:
+  password: "{{ vault_ldap_root_pass }}"
+
 vault_ldap_root_pass: "C4mbia_Esta_Contraseña_Por_Vault"
+
+bind_dn: "cn={{ ldap_admin_user }},{{ ldap.base_dn }}"
+bind_pw: "{{ ldap_admin.password }}"
