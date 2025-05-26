@@ -1,4 +1,15 @@
 users:
+  - uid: admin1
+    cn: "Admin Uno"
+    sn: "Uno"
+    password: "adminpass1"
+    groups:
+      - Administradores
+    uidNumber: 20000
+    gidNumber: 10000
+    homeDirectory: "/home/admin1"
+    loginShell: "/bin/bash"
+
   - uid: dev1
     cn: "Dev One"
     sn: "One"

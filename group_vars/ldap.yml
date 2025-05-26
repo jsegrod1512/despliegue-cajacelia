@@ -15,5 +15,6 @@ ldap_admin:
 
 
 group_gids:
+  Administradores: 10000
   Desarrolladores: 10001
   Clientes: 10002
