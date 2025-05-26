@@ -1,3 +1,4 @@
+---
 - name: Configurar Servidor LDAP
   hosts: ldap
   become: true

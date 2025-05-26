@@ -1,0 +1,13 @@
+[Unit]
+Description=Flask WebApp with LDAP Auth
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory={{ app_dest }}
+Environment="PATH={{ venv_path }}/bin"
+ExecStart={{ venv_path }}/bin/gunicorn -b 0.0.0.0:8080 app:app
+
+[Install]
+WantedBy=multi-user.target

@@ -1,34 +1,36 @@
 ---
-- name: Playbook para instalar la pila LAMP en el Backend
+- name: Instalar y configurar MySQL en el host database
   hosts: database
   become: yes
-
   vars_files:
-    - ../vars/variables.yml
+    - ../group_vars/database.yml
 
   tasks:
-
     - name: Actualizar los repositorios
       apt:
         update_cache: yes
 
-    - name: Instalar el sistema gestor de bases de datos MySQL
+    - name: Instalar MySQL Server
       apt:
         name: mysql-server
         state: present
 
-    - name: Instalamos el módulo de pymysql
+    - name: Instalar módulo Python para conectividad MySQL
       apt:
         name: python3-pymysql
         state: present
 
-    - name: Configuramos MySQL para permitir conexiones desde cualquier interfaz
-      replace:
+    - name: Asegurar línea bind-address en mysqld.cnf
+      lineinfile:
         path: /etc/mysql/mysql.conf.d/mysqld.cnf
-        regexp: 127.0.0.1
-        replace: "{{ ip.backend }}"
+        regexp: '^bind-address\s*='
+        line: "bind-address = {{ mysql_bind_address }}"
+        backup: yes
 
-    - name: Reiniciamos el servicio de base de datos
+    - name: Reiniciar servicio MySQL
       service:
         name: mysql
         state: restarted
+        enabled: yes
+
+    

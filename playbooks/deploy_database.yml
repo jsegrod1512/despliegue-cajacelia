@@ -1,30 +1,28 @@
 ---
-- name: Playbook para instalar la pila LAMP en el Backend
+- name: Desplegar base de datos MySQL en el host database
   hosts: database
   become: yes
-
   vars_files:
-    - ../vars/variables.yml
+    - ../group_vars/database.yml
 
   tasks:
-
-    - name: Borrar la base de datos si existe
+    - name: Eliminar base de datos de la app si existe
       mysql_db:
-        name: "{{ db.name }}"
+        name: "{{ app_db.name }}"
         state: absent
         login_unix_socket: /var/run/mysqld/mysqld.sock
 
-    - name: Crear una base de datos
+    - name: Crear base de datos de la app
       mysql_db:
-        name: "{{ db.name }}"
+        name: "{{ app_db.name }}"
         state: present
-        login_unix_socket: /var/run/mysqld/mysqld.sock 
+        login_unix_socket: /var/run/mysqld/mysqld.sock
 
-    - name: Crear el usuario de la base de datos
-      mysql_user:         
-        name: "{{ db.user }}"
-        password: "{{ db.password }}"
-        priv: "{{ db.name }}.*:ALL"
+    - name: Crear usuario para la app con todos los privilegios
+      mysql_user:
+        name: "{{ app_db.user }}"
+        password: "{{ app_db.password }}"
+        priv: "{{ app_db.name }}.*:ALL"
         host: "%"
         state: present
-        login_unix_socket: /var/run/mysqld/mysqld.sock 
+        login_unix_socket: /var/run/mysqld/mysqld.sock
