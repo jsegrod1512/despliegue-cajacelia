@@ -6,7 +6,7 @@ class Config:
     # LDAP
     LDAP_SERVER   = "{{ ldap.uri }}"
     LDAP_BASE_DN  = "{{ ldap.base_dn }}"
-    LDAP_USER_DN  = "ou=Users,{{ ldap.base_dn }}"
+    LDAP_USER_DN  = "ou=People,{{ ldap.base_dn }}"
 
     # Credenciales de bind para búsqueda en LDAP
     LDAP_BIND_DN  = "cn={{ ldap_admin.user }},{{ ldap.base_dn }}"
