@@ -105,3 +105,21 @@
       loop: "{{ users | zip(hashed_passwords.results) | list }}"
       loop_control:
         label: "{{ item.0.uid }}"
+
+    - name: Añadir cada usuario a su grupo con memberUid
+      collections:
+        - community.general
+      community.general.ldap_attrs:
+        dn: "cn={{ item.1 }},ou=Groups,{{ base_dn }}"
+        bind_dn:    "{{ ldap_root_dn }}"
+        bind_pw:    "{{ ldap_root_pass }}"
+        server_uri: "{{ ldap_uri }}"
+        attributes:
+          # Añade este valor a memberUid (si ya existe, lo ignora)
+          memberUid:
+            - "{{ item.0.uid }}"
+        state: present
+      loop: "{{ users | subelements('groups') }}"
+      loop_control:
+        label: "{{ item.0.uid }} → {{ item.1 }}"
+

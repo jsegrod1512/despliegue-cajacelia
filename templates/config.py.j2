@@ -1,29 +1,44 @@
-import os
+import logging
 
 class Config:
     SECRET_KEY = "{{ flask_secret_key }}"
 
-    # LDAP
-    LDAP_USER_SEARCH_SCOPE   = "SUBTREE"                   # busca recursivamente bajo ou=People
-    LDAP_GROUP_SEARCH_SCOPE  = "SUBTREE"                   # busca recursivamente bajo ou=Groups
-    LDAP_GROUP_OBJECT_FILTER = "(objectClass=posixGroup)"  # sólo posixGroup 
-    LDAP_GROUP_MEMBERS_ATTR  = "memberUid"                 # usa memberUid en grupos POSIX
-    LDAP_GROUP_NAME_ATTRIBUTE= "cn"                        # nombre de cada grupo 
+    # --- Logging LDAP ---
+    LOGGING_LEVEL                = logging.DEBUG
+    LDAP3_LOGIN_CONFIG_LOG_LEVEL = logging.DEBUG
 
-    LDAP_HOST   = "{{ ldap.uri }}"
-    #LDAP_HOST = LDAP_SERVER
-    LDAP_BASE_DN  = "{{ ldap.base_dn }}"
+    # --- Conexión LDAP ---
+    LDAP_HOST    = "{{ ldap.uri }}"
+    LDAP_PORT    = 389
+    LDAP_USE_SSL = False
+
+    # --- DN base ---
+    LDAP_BASE_DN  = "{{ ldap.base_dn }}"     # dc=cajacelia,dc=es
     LDAP_USER_DN  = "ou=People"
     LDAP_GROUP_DN = "ou=Groups"
 
-    # Credenciales de bind para búsqueda en LDAP
-    # LDAP_BIND_DN  = "cn={{ ldap_admin.user }},{{ ldap.base_dn }}"
-    # LDAP_BIND_PW  = "{{ ldap_admin.password }}"
+    # --- Atributos de usuario ---
+    LDAP_USER_RDN_ATTR       = "uid"
+    LDAP_USER_LOGIN_ATTR     = "uid"
+    LDAP_GET_USER_ATTRIBUTES = ["cn", "mail"]
+    LDAP_USER_SEARCH_SCOPE   = "SUBTREE"
+
+    # --- Atributos de grupo (no usados por la extensión) ---
+    LDAP_GROUP_OBJECT_FILTER   = "(objectClass=posixGroup)"
+    LDAP_GROUP_MEMBERS_ATTR    = "memberUid"
+    LDAP_GROUP_NAME_ATTRIBUTE  = "cn"
+    LDAP_GROUP_SEARCH_SCOPE    = "SUBTREE"
+    LDAP_GROUP_SEARCH_FILTER   = "(&(objectClass=posixGroup)(memberUid={u}))"
+
+    # --- Desactivar búsqueda automática de grupos ---
+    LDAP_FIND_GROUPS = False
+
+    # --- Credenciales de bind ---
     LDAP_BIND_USER_DN       = "cn={{ ldap_admin.user }},{{ ldap.base_dn }}"
     LDAP_BIND_USER_PASSWORD = "{{ ldap_admin.password }}"
 
-    # MySQL
-    DB_HOST       = "{{ app_db.host }}"
-    DB_USER       = "{{ app_db.user }}"
-    DB_PASS       = "{{ app_db.password }}"
-    DB_NAME       = "{{ app_db.name }}"
+    # --- MySQL ---
+    DB_HOST = "{{ app_db.host }}"
+    DB_USER = "{{ app_db.user }}"
+    DB_PASS = "{{ app_db.password }}"
+    DB_NAME = "{{ app_db.name }}"
