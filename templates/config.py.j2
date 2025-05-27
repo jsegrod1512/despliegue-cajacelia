@@ -4,14 +4,23 @@ class Config:
     SECRET_KEY = "{{ flask_secret_key }}"
 
     # LDAP
-    LDAP_SERVER   = "{{ ldap.uri }}"
-    LDAP_HOST = LDAP_SERVER
+    LDAP_USER_SEARCH_SCOPE   = "SUBTREE"                   # busca recursivamente bajo ou=People
+    LDAP_GROUP_SEARCH_SCOPE  = "SUBTREE"                   # busca recursivamente bajo ou=Groups
+    LDAP_GROUP_OBJECT_FILTER = "(objectClass=posixGroup)"  # sólo posixGroup 
+    LDAP_GROUP_MEMBERS_ATTR  = "memberUid"                 # usa memberUid en grupos POSIX
+    LDAP_GROUP_NAME_ATTRIBUTE= "cn"                        # nombre de cada grupo 
+
+    LDAP_HOST   = "{{ ldap.uri }}"
+    #LDAP_HOST = LDAP_SERVER
     LDAP_BASE_DN  = "{{ ldap.base_dn }}"
-    LDAP_USER_DN  = "ou=People,{{ ldap.base_dn }}"
+    LDAP_USER_DN  = "ou=People"
+    LDAP_GROUP_DN = "ou=Groups"
 
     # Credenciales de bind para búsqueda en LDAP
-    LDAP_BIND_DN  = "cn={{ ldap_admin.user }},{{ ldap.base_dn }}"
-    LDAP_BIND_PW  = "{{ ldap_admin.password }}"
+    # LDAP_BIND_DN  = "cn={{ ldap_admin.user }},{{ ldap.base_dn }}"
+    # LDAP_BIND_PW  = "{{ ldap_admin.password }}"
+    LDAP_BIND_USER_DN       = "cn={{ ldap_admin.user }},{{ ldap.base_dn }}"
+    LDAP_BIND_USER_PASSWORD = "{{ ldap_admin.password }}"
 
     # MySQL
     DB_HOST       = "{{ app_db.host }}"
