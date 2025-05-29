@@ -8,6 +8,33 @@ Vagrant.configure("2") do |config|
   # Genera una clave SSH distinta para cada VM (mejor seguridad)
   config.ssh.insert_key = true
 
+  # # 0) pfSense
+  # config.vm.define "pfsense" do |node|
+  #   node.vm.box = "pfsense"
+  #   node.vm.hostname = "pfsense"
+  #   node.vm.network "public_network",
+  #     type: "dhcp",
+  #     bridge: "wlo1"
+  #   node.vm.network "private_network",
+  #     ip: "172.16.1.1",
+  #     virtualbox__intnet: "LAN"
+  #   node.vm.network "private_network",
+  #     ip: "10.1.0.1",
+  #     virtualbox__intnet: "DMZ"
+  #   node.vm.provider "virtualbox" do |vb|
+  #     vb.name   = "pfSense"
+  #     vb.memory = 2048
+  #   end
+
+  #   node.vm.synced_folder "./templates", "/vagrant/templates", type: "virtualbox"
+
+  #   node.vm.provision "shell", privileged: true, inline: <<-SHELL
+  #     cp /vagrant/templates/config-pfsense.cajacelia.es /conf/config.xml
+  #     touch /conf/needs_config_restore
+  #     reboot
+  #   SHELL
+  # end
+
   # 1) VM en DMZ: webserver
   config.vm.define "webserver" do |node|
     node.vm.hostname = "webserver"
