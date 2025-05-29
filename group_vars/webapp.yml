@@ -1,0 +1,23 @@
+# Variables para el despliegue de la aplicación web
+
+# Orígenes y destinos
+app_repo: "https://github.com/jsegrod1512/flask-ldap-app.git"
+app_dest: "/opt/webapp"
+venv_path: "/opt/webapp/venv"
+
+# Flask
+flask_secret_key: "4f8d2a7b-9e1c-4a2e-b1f3-d5a6e8c3f7a4"  # cámbiala por una UUID/secret real
+
+# LDAP (lectura)
+ldap_server: "ldap://172.16.1.12"
+base_dn:      "dc=cajacelia,dc=es"
+ldap_user_dn: "ou=Users,{{ base_dn }}"
+
+# MySQL (para la aplicación)
+db_host: "{{ db.host | default('172.16.1.11') }}"
+db_name: "app_db"
+db_user: "app_user"
+db_pass: "{{ vault_app_db_password }}"  # definida en Vault o aquí
+
+# Variables sensibles (recomiendo Ansible Vault)
+vault_app_db_password: "S3gura!P455w0rdWebApp"

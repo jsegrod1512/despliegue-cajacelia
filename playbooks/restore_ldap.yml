@@ -1,0 +1,27 @@
+# playbook_restore_ldap.yml
+- name: Restaurar OpenLDAP desde LDIF
+  hosts: ldap
+  become: true
+  vars:
+    backup_file: "/var/backups/ldap/ldap-2025-05-15.ldif"   # ajusta nombre
+  tasks:
+    - name: Parar slapd
+      service:
+        name: slapd
+        state: stopped
+
+    - name: Importar LDIF con slapadd
+      command: slapadd -v -l {{ backup_file }}
+
+    - name: Ajustar permisos en /var/lib/ldap (o donde esté DIT)
+      file:
+        path: /var/lib/ldap
+        state: directory
+        recurse: yes
+        owner: openldap
+        group: openldap
+
+    - name: Arrancar slapd
+      service:
+        name: slapd
+        state: started

@@ -1,0 +1,65 @@
+---
+- name: Instalar Jenkins LTS en CI-CD
+  hosts: ci-cd
+  become: true
+
+  vars:
+    # URL del repositorio LTS estable
+    jenkins_repo_url: "https://pkg.jenkins.io/debian-stable"
+    # Clave LTS nueva (abril 2023)
+    jenkins_key_url: "{{ jenkins_repo_url }}/jenkins.io-2023.key"
+    keyring_path: "/usr/share/keyrings/jenkins-jenkins.io-2023.gpg"
+
+  tasks:
+    - name: Instalar dependencias necesarias para añadir repositorios HTTPS
+      apt:
+        name:
+          - openjdk-17-jdk
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: yes
+
+    - name: Descargar la nueva clave GPG de Jenkins LTS
+      ansible.builtin.get_url:
+        url: "{{ jenkins_key_url }}"
+        dest: "/tmp/jenkins-lts.key"
+        mode: '0644'
+      register: gpg_fetch
+
+    - name: Convertir la clave a formato dearmored y guardarla en keyrings
+      command:
+        cmd: >
+          gpg --dearmor
+          --yes
+          --output "{{ keyring_path }}"
+          "/tmp/jenkins-lts.key"
+      args:
+        creates: "{{ keyring_path }}"
+      when: gpg_fetch.changed
+
+    - name: Eliminar el fichero temporal de clave
+      file:
+        path: "/tmp/jenkins-lts.key"
+        state: absent
+
+    - name: Añadir el repositorio de Jenkins LTS con signed-by
+      apt_repository:
+        repo: "deb [signed-by={{ keyring_path }}] {{ jenkins_repo_url }} binary/"
+        state: present
+
+    - name: Actualizar caché de APT
+      apt:
+        update_cache: yes
+
+    - name: Instalar o actualizar Jenkins
+      apt:
+        name: jenkins
+        state: latest
+
+    - name: Asegurar que el servicio Jenkins esté habilitado y en marcha
+      service:
+        name: jenkins
+        state: started
+        enabled: yes

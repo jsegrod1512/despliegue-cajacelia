@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<pfsense>
+	<version>23.3</version>
+	<lastchange></lastchange>
+	<system>
+		<optimization>normal</optimization>
+		<hostname>pfsense</hostname>
+
+Aquí va el resto...

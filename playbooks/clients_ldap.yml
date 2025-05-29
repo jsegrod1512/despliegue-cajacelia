@@ -1,0 +1,183 @@
+---
+- name: Configurar clientes LDAP y PAM en Ubuntu 24.04
+  hosts: clients
+  become: true
+  vars_files:
+    - ../group_vars/ldap.yml   # ldap_uri, base_dn, ldap_root_dn, ldap_root_pass
+    - ../users/users.yml             # users: [...] con uid, homeDirectory, gidNumber, etc.
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  tasks:
+    - name: Instalar paquetes NSS/PAM LDAP
+      apt:
+        name:
+          - libnss-ldapd
+          - libpam-ldapd
+          - nslcd
+          - ldap-utils
+        state: present
+        update_cache: yes
+
+    - name: Borrar /etc/ldap.conf para evitar conflicto
+      file:
+        path: /etc/ldap.conf
+        state: absent
+
+    - name: Desplegar /etc/nslcd.conf (modo 0600)
+      copy:
+        dest: /etc/nslcd.conf
+        owner: root
+        group: nslcd
+        mode: '0600'
+        content: |
+          uid nslcd
+          gid nslcd
+          uri {{ ldap_uri }}
+          base {{ base_dn }}
+          binddn {{ ldap_root_dn }}
+          bindpw {{ ldap_root_pass }}
+          ldap_version 3
+          tls_cacertdir /etc/ssl/certs
+          filter passwd (&(objectClass=posixAccount)(uidNumber>=10000))
+          #filter group  (&(objectClass=posixGroup) (gidNumber>=10000))
+          filter group  (&(objectClass=posixGroup))
+          nss_disable_enumeration no
+      notify:
+        - Restart nslcd
+        - Restart nscd
+
+    - name: Configurar /etc/nsswitch.conf para usar LDAP
+      lineinfile:
+        path: /etc/nsswitch.conf
+        regexp: '^({{ item }}:)'
+        line: '\1 files ldap'
+        backrefs: yes
+      loop:
+        - passwd
+        - group
+        - shadow
+      notify:
+        - Restart nslcd
+        - Restart nscd
+
+    - name: Configurar PAM common-auth
+      block:
+        - name: pam_rootok.so (root siempre OK)
+          community.general.pamd:
+            name: common-auth
+            type: auth
+            control: sufficient
+            module_path: pam_rootok.so
+
+        - name: pam_unix.so antes de pam_nslcd
+          community.general.pamd:
+            name: common-auth
+            type: auth
+            control: '[success=1 default=ignore]'
+            module_path: pam_unix.so
+            module_arguments: 'nullok_secure try_first_pass'
+
+        - name: pam_nslcd.so
+          community.general.pamd:
+            name: common-auth
+            type: auth
+            control: sufficient
+            module_path: pam_nslcd.so
+            module_arguments: 'use_first_pass minimum_uid=10000'
+
+        - name: pam_deny.so al final
+          community.general.pamd:
+            name: common-auth
+            type: auth
+            control: required
+            module_path: pam_deny.so
+      notify:
+        - Restart nscd
+
+    - name: Configurar PAM common-account
+      block:
+        - community.general.pamd:
+            name: common-account
+            type: account
+            control: '[success=1 default=ignore]'
+            module_path: pam_unix.so
+
+        - community.general.pamd:
+            name: common-account
+            type: account
+            control: sufficient
+            module_path: pam_nslcd.so
+            module_arguments: 'initgroups minimum_uid=10000'
+      notify:
+        - Restart nscd
+
+    - name: Configurar PAM common-password
+      block:
+        - community.general.pamd:
+            name: common-password
+            type: password
+            control: requisite
+            module_path: pam_unix.so
+            module_arguments: 'nullok obscure sha512'
+
+        - community.general.pamd:
+            name: common-password
+            type: password
+            control: sufficient
+            module_path: pam_nslcd.so
+            module_arguments: 'use_authtok'
+
+        - community.general.pamd:
+            name: common-password
+            type: password
+            control: required
+            module_path: pam_deny.so
+      notify:
+        - Restart nscd
+
+    - name: Configurar PAM common-session
+      block:
+        - community.general.pamd:
+            name: common-session
+            type: session
+            control: required
+            module_path: pam_unix.so
+
+        - community.general.pamd:
+            name: common-session
+            type: session
+            control: optional
+            module_path: pam_mkhomedir.so
+            module_arguments: 'skel=/etc/skel umask=0022'
+      notify:
+        - Restart nscd
+
+    # NUEVAS TAREAS: creación explícita de home-dirs
+    - name: Crear home directories para usuarios LDAP
+      file:
+        path: "{{ item.homeDirectory }}"
+        state: directory
+        owner: "{{ item.uid }}"
+        group: "{{ item.gidNumber }}"
+        mode: '0755'
+      loop: "{{ users }}"
+      loop_control:
+        label: "{{ item.uid }}"
+      notify:
+        - Restart nslcd
+        - Restart nscd
+
+  handlers:
+    - name: Restart nslcd
+      service:
+        name: nslcd
+        state: restarted
+        enabled: true
+
+    - name: Restart nscd
+      service:
+        name: nscd
+        state: restarted
+        enabled: true

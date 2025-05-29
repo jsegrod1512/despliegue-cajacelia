@@ -1,0 +1,125 @@
+---
+- name: Gestionar OUs y usuarios LDAP con contraseñas SSHA
+  hosts: ldap
+  become: true
+  vars_files:
+    - ../group_vars/ldap.yml    # base_dn, ldap_root_dn, ldap_root_pass
+    - ../users/users.yml              # users: [...]
+
+  tasks:
+    - name: Instalar dependencias LDAP
+      apt:
+        name:
+          - slapd
+          - ldap-utils
+          - python3-ldap
+        state: present
+        update_cache: yes
+
+    - name: Crear OU Groups si no existe
+      community.general.ldap_entry:
+        dn: "ou=Groups,{{ base_dn }}"
+        objectClass:
+          - organizationalUnit
+        attributes:
+          ou: Groups
+        bind_dn: "{{ ldap_root_dn }}"
+        bind_pw: "{{ ldap_root_pass }}"
+        server_uri: ldap://localhost
+        state: present
+
+    - name: Crear OU People si no existe
+      community.general.ldap_entry:
+        dn: "ou=People,{{ base_dn }}"
+        objectClass:
+          - organizationalUnit
+        attributes:
+          ou: People
+        bind_dn: "{{ ldap_root_dn }}"
+        bind_pw: "{{ ldap_root_pass }}"
+        server_uri: ldap://localhost
+        state: present
+
+    - name: Crear/asegurar grupos posixGroup (estructura base ya los define)
+      community.general.ldap_entry:
+        dn: "cn={{ item.key }},ou=Groups,{{ base_dn }}"
+        objectClass:
+          - top
+          - posixGroup
+        attributes:
+          gidNumber: "{{ item.value }}"
+        bind_dn: "{{ ldap_root_dn }}"
+        bind_pw: "{{ ldap_root_pass }}"
+        server_uri: ldap://localhost
+        state: present
+      loop: "{{ group_gids | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Asociar usuarios a sus grupos con memberUid
+      community.general.ldap_entry:
+        dn: "cn={{ item.1 }},ou=Groups,{{ base_dn }}"
+        objectClass:
+          - top
+          - posixGroup
+        attributes:
+          gidNumber: "{{ group_gids[item.1] }}"
+          memberUid: "{{ item.0.uid }}"
+        bind_dn: "{{ ldap_root_dn }}"
+        bind_pw: "{{ ldap_root_pass }}"
+        server_uri: ldap://localhost
+        state: present
+      loop: "{{ users | subelements('groups') }}"
+      loop_control:
+        label: "{{ item.0.uid }} → {{ item.1 }}"
+
+
+    - name: Generar hashes SSHA para cada usuario
+      shell: slappasswd -s "{{ item.password }}"
+      loop: "{{ users }}"
+      register: hashed_passwords
+      changed_when: false
+      loop_control:
+        label: "{{ item.uid }}"
+
+    - name: Crear o actualizar usuarios con posixAccount y password SSHA
+      community.general.ldap_entry:
+        dn: "uid={{ item.0.uid }},ou=People,{{ base_dn }}"
+        objectClass:
+          - top
+          - inetOrgPerson
+          - posixAccount
+        attributes:
+          cn:           "{{ item.0.cn }}"
+          sn:           "{{ item.0.sn }}"
+          uid:          "{{ item.0.uid }}"
+          uidNumber:    "{{ item.0.uidNumber }}"
+          gidNumber:    "{{ item.0.gidNumber }}"
+          homeDirectory: "{{ item.0.homeDirectory }}"
+          loginShell:   "{{ item.0.loginShell }}"
+          userPassword: "{{ item.1.stdout }}"
+        bind_dn:    "{{ ldap_root_dn }}"
+        bind_pw:    "{{ ldap_root_pass }}"
+        server_uri: "{{ ldap_uri | default('ldap://localhost') }}"
+        state: present
+      loop: "{{ users | zip(hashed_passwords.results) | list }}"
+      loop_control:
+        label: "{{ item.0.uid }}"
+
+    - name: Añadir cada usuario a su grupo con memberUid
+      collections:
+        - community.general
+      community.general.ldap_attrs:
+        dn: "cn={{ item.1 }},ou=Groups,{{ base_dn }}"
+        bind_dn:    "{{ ldap_root_dn }}"
+        bind_pw:    "{{ ldap_root_pass }}"
+        server_uri: "{{ ldap_uri }}"
+        attributes:
+          # Añade este valor a memberUid (si ya existe, lo ignora)
+          memberUid:
+            - "{{ item.0.uid }}"
+        state: present
+      loop: "{{ users | subelements('groups') }}"
+      loop_control:
+        label: "{{ item.0.uid }} → {{ item.1 }}"
+

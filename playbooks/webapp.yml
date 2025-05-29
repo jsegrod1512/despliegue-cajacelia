@@ -1,0 +1,91 @@
+---
+- name: Despliegue de la aplicación Flask (WebApp)
+  hosts: webserver
+  become: yes
+
+  vars_files:
+    - ../group_vars/webapp.yml
+    - ../group_vars/database.yml
+    - ../group_vars/ldap.yml
+
+  handlers:
+    - name: Reload systemd
+      command: systemctl daemon-reload
+
+    - name: Restart webapp
+      service:
+        name: webapp
+        state: restarted
+        enabled: yes
+
+  tasks:
+    - name: Actualizar apt e instalar dependencias OS
+      apt:
+        update_cache: yes
+        name:
+          - python3-venv
+          - python3-pip
+          - libldap2-dev
+          - libsasl2-dev
+          - libmysqlclient-dev
+          - git
+
+    - name: Crear directorio de la App
+      file:
+        path: "{{ app_dest }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+    
+    - name: Marcar {{ app_dest }} como safe.directory para Git
+      command: git config --global --add safe.directory {{ app_dest }}
+      args:
+        creates: /root/.gitconfig_safe_{{ app_dest | regex_replace('[^A-Za-z0-9]','_') }}
+      register: git_safe
+
+    - name: Tocar fichero marcador de safe.directory
+      file:
+        path: /root/.gitconfig_safe_{{ app_dest | regex_replace('[^A-Za-z0-9]','_') }}
+        state: touch
+      when: git_safe.changed
+
+    - name: Clonar repositorio de la App Flask-LDAP-MySQL
+      git:
+        repo: "{{ app_repo }}"
+        dest: "{{ app_dest }}"
+        version: main
+      notify: Restart webapp
+
+    - name: Crear virtualenv de Python
+      command: python3 -m venv {{ venv_path }}
+      args:
+        creates: "{{ venv_path }}/bin/activate"
+
+    - name: Instalar requerimientos Python de la app
+      pip:
+        virtualenv: "{{ venv_path }}"
+        requirements: "{{ app_dest }}/requirements.txt"
+
+    - name: Generar config.py de Flask
+      template:
+        src: ../templates/config.py.j2
+        dest: "{{ app_dest }}/config.py"
+        owner: www-data
+        group: www-data
+        mode: '0644'
+      notify: Restart webapp
+
+    - name: Instalar Gunicorn en el virtualenv
+      pip:
+        virtualenv: "{{ venv_path }}"
+        name: gunicorn
+
+    - name: Desplegar unidad systemd de la App
+      template:
+        src: ../templates/webapp.service.j2
+        dest: /etc/systemd/system/webapp.service
+        mode: '0644'
+      notify:
+        - Reload systemd
+        - Restart webapp
