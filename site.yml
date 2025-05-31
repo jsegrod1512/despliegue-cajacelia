@@ -1,10 +1,11 @@
 ---
-- import_playbook: playbooks/install_ldap.yml
-- import_playbook: playbooks/manage_users_ldap.yml
-- import_playbook: playbooks/clients_ldap.yml
-- import_playbook: playbooks/database.yml
-- import_playbook: playbooks/deploy_database.yml
-- import_playbook: playbooks/webapp.yml
-- import_playbook: playbooks/jenkins.yml
-- import_playbook: playbooks/clear.yml
+# - import_playbook: playbooks/install_ldap.yml
+# - import_playbook: playbooks/manage_users_ldap.yml
+# - import_playbook: playbooks/clients_ldap.yml
+# - import_playbook: playbooks/database.yml
+# - import_playbook: playbooks/deploy_database.yml
+# - import_playbook: playbooks/webapp.yml
+- import_playbook: playbooks/install_jenkins.yml
+- import_playbook: playbooks/deploy_jenkins.yml
+# - import_playbook: playbooks/clear.yml
 # - import_playbook: playbooks/backup.yml

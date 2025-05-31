@@ -1,0 +1,43 @@
+# group_vars/jenkins.yml
+
+# URL y credenciales de Jenkins
+jenkins_url: "http://localhost:8080"
+jenkins_admin_user: "admin"
+
+# Token de API de Jenkins (generado en la UI de Jenkins)
+vault_jenkins_api_token: "TU_JENKINS_API_TOKEN_AQUI"
+
+# Plugins que quieres instalar (nombres tal como aparecen en Update Center)
+jenkins_plugins:
+  - workflow-aggregator
+  - git
+  - credentials-binding
+  - ansible
+  - docker-workflow
+
+# Credenciales SSH para Git (para pipelines que necesiten clonar repositorios privados)
+ssh_creds:
+  id: "git-ssh-key"
+  description: "Clave SSH para Git"
+  username: "git"
+  private_key_path: "~/.ssh/id_rsa"
+
+# Credenciales de DockerHub (si tus pipelines hacen docker push/pull)
+dockerhub_creds:
+  id: "dockerhub-creds"
+  description: "Credenciales DockerHub"
+  username: "{{ vault_dockerhub_user }}"
+  password: "{{ vault_dockerhub_pass }}"
+
+# Declaración de los jobs de Jenkins que vas a importar desde XML
+jenkins_jobs:
+  - name: "Webapp-CI"
+    xml: "webapp-ci.xml"
+  - name: "Infra-IaC"
+    xml: "infra-iac.xml"
+  - name: "Smoke-Tests"
+    xml: "smoke-tests.xml"
+
+# Usuario y contraseña de DockerHub en Vault (reemplaza con tus propias variables Vault)
+vault_dockerhub_user: "TU_DOCKERHUB_USER"
+vault_dockerhub_pass: "TU_DOCKERHUB_PASS"

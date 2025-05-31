@@ -1,0 +1,106 @@
+---
+- name: Desplegar configuración y jobs en Jenkins
+  hosts: ci-cd
+  become: true
+
+  # 1) Aseguramos la colección community.general para módulos de Jenkins
+  collections:
+    - community.general
+
+  vars_files:
+    - ../group_vars/jenkins.yml
+
+  tasks:
+    - name: Esperar a que Jenkins arranque y acepte conexiones
+      uri:
+        url: "{{ jenkins_url }}/login"
+        status_code: 200
+      register: j_up
+      retries: 10
+      delay: 15
+      until: j_up.status == 200
+
+    - name: Instalar plugins necesarios en Jenkins
+      jenkins_plugin:
+        name: "{{ jenkins_plugins }}"
+        url: "{{ jenkins_url }}"
+        user: "{{ jenkins_admin_user }}"
+        token: "{{ vault_jenkins_api_token }}"
+        state: latest
+
+    - name: Desplegar archivo JCasC (Configuration as Code)
+      copy:
+        src: "../jenkins/casc/jenkins.yaml"
+        dest: "/var/lib/jenkins/casc.yaml"
+        owner: jenkins
+        group: jenkins
+        mode: '0644'
+
+    - name: Garantizar variable de entorno para JCasC en /etc/default/jenkins
+      lineinfile:
+        path: /etc/default/jenkins
+        regexp: '^CASC_JENKINS_CONFIG='
+        line: "CASC_JENKINS_CONFIG=/var/lib/jenkins/casc.yaml"
+        create: yes
+
+    - name: Reiniciar Jenkins para aplicar JCasC y plugins
+      service:
+        name: jenkins
+        state: restarted
+
+    - name: Crear credencial SSH para Git (Groovy via jenkins_script)
+      jenkins_script:
+        url: "{{ jenkins_url }}"
+        user: "{{ jenkins_admin_user }}"
+        password: "{{ vault_jenkins_api_token }}"
+        script: |
+          import com.cloudbees.plugins.credentials.*
+          import com.cloudbees.plugins.credentials.domains.*
+          import com.cloudbees.plugins.credentials.impl.*
+          import jenkins.model.*
+          def store = Jenkins.instance.getExtensionList(
+            'com.cloudbees.plugins.credentials.SystemCredentialsProvider'
+          )[0].getStore()
+          def key = new BasicSSHUserPrivateKey(
+            CredentialsScope.GLOBAL,
+            '{{ ssh_creds.id }}',
+            '{{ ssh_creds.username }}',
+            new BasicSSHUserPrivateKey.DirectEntryPrivateKeySource(
+              '''{{ lookup("file", ssh_creds.private_key_path) }}'''
+            ),
+            '',
+            '{{ ssh_creds.description }}'
+          )
+          store.addCredentials(Domain.global(), key)
+
+    - name: Crear credencial DockerHub (Groovy via jenkins_script)
+      jenkins_script:
+        url: "{{ jenkins_url }}"
+        user: "{{ jenkins_admin_user }}"
+        password: "{{ vault_jenkins_api_token }}"
+        script: |
+          import com.cloudbees.plugins.credentials.*
+          import com.cloudbees.plugins.credentials.domains.*
+          import com.cloudbees.plugins.credentials.impl.*
+          import jenkins.model.*
+          def store = Jenkins.instance.getExtensionList(
+            'com.cloudbees.plugins.credentials.SystemCredentialsProvider'
+          )[0].getStore()
+          def creds = new UsernamePasswordCredentialsImpl(
+            CredentialsScope.GLOBAL,
+            '{{ dockerhub_creds.id }}',
+            '{{ dockerhub_creds.description }}',
+            '{{ dockerhub_creds.username }}',
+            '{{ dockerhub_creds.password }}'
+          )
+          store.addCredentials(Domain.global(), creds)
+
+    - name: Crear o actualizar los jobs de Jenkins a partir de XML
+      jenkins_job:
+        url: "{{ jenkins_url }}"
+        user: "{{ jenkins_admin_user }}"
+        token: "{{ vault_jenkins_api_token }}"
+        name: "{{ item.name }}"
+        config: "{{ lookup('file','../jenkins/jobs/' + item.xml) }}"
+        state: present
+      loop: "{{ jenkins_jobs }}"
