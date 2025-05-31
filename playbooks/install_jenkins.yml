@@ -1,65 +1,72 @@
 ---
-- name: Instalar Jenkins LTS en CI-CD
+- name: Instalar Jenkins LTS y Java en el nodo CI-CD
   hosts: ci-cd
   become: true
 
-  vars:
-    # URL del repositorio LTS estable
-    jenkins_repo_url: "https://pkg.jenkins.io/debian-stable"
-    # Clave LTS nueva (abril 2023)
-    jenkins_key_url: "{{ jenkins_repo_url }}/jenkins.io-2023.key"
-    keyring_path: "/usr/share/keyrings/jenkins-jenkins.io-2023.gpg"
+  vars_files:
+    - ../group_vars/jenkins.yml
 
   tasks:
-    - name: Instalar dependencias necesarias para añadir repositorios HTTPS
+    - name: Actualizar caché de APT
+      apt:
+        update_cache: yes
+      tags: ['jenkins', 'java']
+    # Descarga el índice de paquetes más reciente. :contentReference[oaicite:0]{index=0}
+
+    - name: Instalar dependencias necesarias para Jenkins (Java, curl, gnupg, ca-certificates)
       apt:
         name:
-          - openjdk-17-jdk
+          - openjdk-11-jdk
           - ca-certificates
           - curl
           - gnupg
         state: present
-        update_cache: yes
+      tags: ['jenkins', 'java']
+    # Jenkins requiere Java; además usamos curl y gnupg para descargar y validar la clave. :contentReference[oaicite:1]{index=1}
 
-    - name: Descargar la nueva clave GPG de Jenkins LTS
-      ansible.builtin.get_url:
-        url: "{{ jenkins_key_url }}"
-        dest: "/tmp/jenkins-lts.key"
+    - name: Descargar la clave GPG oficial de Jenkins LTS (abril 2023)
+      get_url:
+        url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key"
+        dest: "/usr/share/keyrings/jenkins-keyring.asc"
         mode: '0644'
-      register: gpg_fetch
+      tags: ['jenkins', 'gpg']
+    # Esta es la clave publicada por Jenkins para LTS (ID 5BA31D57EF5975CA). :contentReference[oaicite:2]{index=2}
 
-    - name: Convertir la clave a formato dearmored y guardarla en keyrings
-      command:
-        cmd: >
-          gpg --dearmor
-          --yes
-          --output "{{ keyring_path }}"
-          "/tmp/jenkins-lts.key"
-      args:
-        creates: "{{ keyring_path }}"
-      when: gpg_fetch.changed
-
-    - name: Eliminar el fichero temporal de clave
-      file:
-        path: "/tmp/jenkins-lts.key"
-        state: absent
-
-    - name: Añadir el repositorio de Jenkins LTS con signed-by
+    - name: Añadir repositorio de Jenkins LTS firmado con /usr/share/keyrings/jenkins-keyring.asc
       apt_repository:
-        repo: "deb [signed-by={{ keyring_path }}] {{ jenkins_repo_url }} binary/"
+        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+        filename: "jenkins"
         state: present
-
-    - name: Actualizar caché de APT
-      apt:
         update_cache: yes
+      tags: ['jenkins', 'repo']
+    # La entrada apunta a “https://pkg.jenkins.io/debian-stable binary/” y usa la clave recién descargada. :contentReference[oaicite:3]{index=3}
 
-    - name: Instalar o actualizar Jenkins
+    - name: Instalar Jenkins LTS
       apt:
         name: jenkins
         state: latest
+      tags: ['jenkins', 'install']
+    # Con el repositorio ya activo, descarga e instala el paquete jenkins. :contentReference[oaicite:4]{index=4}
 
-    - name: Asegurar que el servicio Jenkins esté habilitado y en marcha
+    - name: Deshabilitar el setup wizard de Jenkins en arrancos futuros
+      lineinfile:
+        path: /etc/default/jenkins
+        regexp: '^JAVA_ARGS='
+        line: 'JAVA_ARGS="-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false"'
+        create: yes
+      tags: ['jenkins', 'jcasc']
+    # Esto evita que Jenkins pida la contraseña inicial “initialAdminPassword” al arrancar. 
+
+    - name: Reiniciar Jenkins para aplicar la desactivación del wizard
       service:
         name: jenkins
-        state: started
+        state: restarted
+      tags: ['jenkins', 'restart']
+    # Reinicia Jenkins de inmediato, para que arranque sin wizard. :contentReference[oaicite:6]{index=6}
+
+    - name: Habilitar Jenkins al inicio
+      service:
+        name: jenkins
         enabled: yes
+      tags: ['jenkins', 'enable']
+    # Asegura que Jenkins arranque automáticamente al iniciar la máquina. :contentReference[oaicite:7]{index=7}

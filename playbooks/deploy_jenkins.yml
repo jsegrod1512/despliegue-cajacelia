@@ -1,9 +1,8 @@
 ---
-- name: Desplegar configuración y jobs en Jenkins
+- name: Desplegar Jenkins Configuration as Code y jobs
   hosts: ci-cd
   become: true
 
-  # 1) Aseguramos la colección community.general para módulos de Jenkins
   collections:
     - community.general
 
@@ -11,48 +10,59 @@
     - ../group_vars/jenkins.yml
 
   tasks:
-    - name: Esperar a que Jenkins arranque y acepte conexiones
+    - name: Esperar a que Jenkins acepte conexiones HTTP
       uri:
         url: "{{ jenkins_url }}/login"
         status_code: 200
+        return_content: no
       register: j_up
       retries: 10
       delay: 15
       until: j_up.status == 200
+      tags: ['jenkins', 'jcasc']
+    # :contentReference[oaicite:11]{index=11}
+
+    - name: Copiar archivo JCasC (jenkins.yaml) al home de Jenkins
+      copy:
+        src: "../jenkins/casc/jenkins.yaml"
+        dest: "/var/lib/jenkins/jenkins.yaml"
+        owner: jenkins
+        group: jenkins
+        mode: '0644'
+      tags: ['jenkins', 'jcasc']
+    # :contentReference[oaicite:12]{index=12}
+
+    - name: Asegurar variable de entorno para JCasC en /etc/default/jenkins
+      lineinfile:
+        path: /etc/default/jenkins
+        regexp: '^CASC_JENKINS_CONFIG='
+        line: "CASC_JENKINS_CONFIG=/var/lib/jenkins/jenkins.yaml"
+        create: yes
+      tags: ['jenkins', 'jcasc']
+    # :contentReference[oaicite:13]{index=13}
 
     - name: Instalar plugins necesarios en Jenkins
       jenkins_plugin:
         name: "{{ jenkins_plugins }}"
         url: "{{ jenkins_url }}"
         user: "{{ jenkins_admin_user }}"
-        token: "{{ vault_jenkins_api_token }}"
+        password: "{{ jenkins_admin_password }}"
         state: latest
-
-    - name: Desplegar archivo JCasC (Configuration as Code)
-      copy:
-        src: "../jenkins/casc/jenkins.yaml"
-        dest: "/var/lib/jenkins/casc.yaml"
-        owner: jenkins
-        group: jenkins
-        mode: '0644'
-
-    - name: Garantizar variable de entorno para JCasC en /etc/default/jenkins
-      lineinfile:
-        path: /etc/default/jenkins
-        regexp: '^CASC_JENKINS_CONFIG='
-        line: "CASC_JENKINS_CONFIG=/var/lib/jenkins/casc.yaml"
-        create: yes
+      tags: ['jenkins', 'plugins']
+    # 
 
     - name: Reiniciar Jenkins para aplicar JCasC y plugins
       service:
         name: jenkins
         state: restarted
+      tags: ['jenkins', 'restart']
+    # :contentReference[oaicite:15]{index=15}
 
     - name: Crear credencial SSH para Git (Groovy via jenkins_script)
       jenkins_script:
         url: "{{ jenkins_url }}"
         user: "{{ jenkins_admin_user }}"
-        password: "{{ vault_jenkins_api_token }}"
+        password: "{{ jenkins_admin_password }}"
         script: |
           import com.cloudbees.plugins.credentials.*
           import com.cloudbees.plugins.credentials.domains.*
@@ -61,7 +71,7 @@
           def store = Jenkins.instance.getExtensionList(
             'com.cloudbees.plugins.credentials.SystemCredentialsProvider'
           )[0].getStore()
-          def key = new BasicSSHUserPrivateKey(
+          def keyCred = new BasicSSHUserPrivateKey(
             CredentialsScope.GLOBAL,
             '{{ ssh_creds.id }}',
             '{{ ssh_creds.username }}',
@@ -71,13 +81,15 @@
             '',
             '{{ ssh_creds.description }}'
           )
-          store.addCredentials(Domain.global(), key)
+          store.addCredentials(Domain.global(), keyCred)
+      tags: ['jenkins', 'credentials']
+    # :contentReference[oaicite:16]{index=16}
 
     - name: Crear credencial DockerHub (Groovy via jenkins_script)
       jenkins_script:
         url: "{{ jenkins_url }}"
         user: "{{ jenkins_admin_user }}"
-        password: "{{ vault_jenkins_api_token }}"
+        password: "{{ jenkins_admin_password }}"
         script: |
           import com.cloudbees.plugins.credentials.*
           import com.cloudbees.plugins.credentials.domains.*
@@ -86,21 +98,25 @@
           def store = Jenkins.instance.getExtensionList(
             'com.cloudbees.plugins.credentials.SystemCredentialsProvider'
           )[0].getStore()
-          def creds = new UsernamePasswordCredentialsImpl(
+          def dockerCred = new UsernamePasswordCredentialsImpl(
             CredentialsScope.GLOBAL,
             '{{ dockerhub_creds.id }}',
             '{{ dockerhub_creds.description }}',
             '{{ dockerhub_creds.username }}',
             '{{ dockerhub_creds.password }}'
           )
-          store.addCredentials(Domain.global(), creds)
+          store.addCredentials(Domain.global(), dockerCred)
+      tags: ['jenkins', 'credentials']
+    # 
 
-    - name: Crear o actualizar los jobs de Jenkins a partir de XML
+    - name: Crear o actualizar los jobs de Jenkins desde XML
       jenkins_job:
         url: "{{ jenkins_url }}"
         user: "{{ jenkins_admin_user }}"
-        token: "{{ vault_jenkins_api_token }}"
+        token: "{{ jenkins_admin_password }}"
         name: "{{ item.name }}"
-        config: "{{ lookup('file','../jenkins/jobs/' + item.xml) }}"
+        config: "{{ lookup('file', '../jenkins/jobs/' + item.xml) }}"
         state: present
       loop: "{{ jenkins_jobs }}"
+      tags: ['jenkins', 'jobs']
+    # 
