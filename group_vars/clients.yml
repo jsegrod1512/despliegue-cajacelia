@@ -24,3 +24,6 @@ paquetes_cliente:
   - libreoffice
   - remmina
 # ──────────────────────────────────────────────────────────────────────────
+
+proxy_user: dev1
+proxy_pass: devpass1

@@ -159,6 +159,47 @@
           Exec=/usr/local/bin/auto_launch_role_app.sh
           X-GNOME-Autostart-enabled=true
           NoDisplay=true
+    
+    # ──────────────────────────────────────────────────────────────────────────
+    # 3) Configurar PROXY a nivel de sistema (/etc/profile.d, APT y GNOME)    #
+    # ──────────────────────────────────────────────────────────────────────────
+    
+    - name: Asegurar que existe /etc/dconf/db/local.d
+      file:
+        path: /etc/dconf/db/local.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Crear override de dconf para proxy en GNOME
+      copy:
+        dest: /etc/dconf/db/local.d/01-proxy
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [system/proxy]
+          mode='manual'
+
+          [system/proxy/http]
+          host='pfsense.cajacelia.es'
+          port=3128
+          use-authentication=true
+          authentication-user='{{ proxy_user }}'
+          authentication-password='{{ proxy_pass }}'
+
+          [system/proxy/https]
+          host='pfsense.cajacelia.es'
+          port=3129
+          use-authentication=true
+          authentication-user='{{ proxy_user }}'
+          authentication-password='{{ proxy_pass }}'
+
+          [system/proxy/ignore-hosts]
+          value=['10.1.0.0/24']
+      notify:
+        - Update Dconf
 
     # ──────────────────────────────────────────────────────────────────────────
     # Resto de tareas (ocultar iconos en /etc/skel, ACLs, home_permissions, sudoers)
@@ -260,3 +301,9 @@
         name: nscd
         state: restarted
         enabled: true
+
+    - name: Update Dconf
+      command: dconf update
+      args:
+        warn: false
+      changed_when: true
