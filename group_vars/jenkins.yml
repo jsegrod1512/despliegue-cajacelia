@@ -1,37 +1,18 @@
-# group_vars/jenkins.yml
+---
+# Paquete de Java requerido por Jenkins (OpenJDK 17 en Ubuntu 24.04)
+java_package: "openjdk-17-jdk" 
 
-jenkins_url: "http://localhost:8080"
-jenkins_admin_user: "admin"
-# Ya no necesitas vault_jenkins_api_token aquí, porque usaremos admin/AdminPass123! (según JCasC) para
-# invocar la API. Si deseas cifrarlo, puedes usar Ansible Vault:
-jenkins_admin_password: "AdminPass123!"
+# URL de la clave GPG oficial de Jenkins para verificar el repositorio
+jenkins_gpg_key_url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key" 
 
-jenkins_plugins:
-  - workflow-aggregator
-  - git
-  - credentials-binding
-  - ansible
-  - docker-workflow
+# Entrada para /etc/apt/sources.list.d/jenkins.list (repositorio oficial de Jenkins)
+jenkins_repo_entry: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" 
 
-ssh_creds:
-  id: "git-ssh-key"
-  description: "Clave SSH para Git"
-  username: "git"
-  private_key_path: "~/.ssh/id_rsa"
+# Nombre del paquete que se instalará (desde el repositorio de Jenkins)
+jenkins_package: "jenkins"  
 
-dockerhub_creds:
-  id: "dockerhub-creds"
-  description: "Credenciales DockerHub"
-  username: "{{ vault_dockerhub_user }}"
-  password: "{{ vault_dockerhub_pass }}"
+# Nombre del servicio systemd de Jenkins
+jenkins_service: "jenkins" 
 
-jenkins_jobs:
-  - name: "Webapp-CI"
-    xml: "webapp-ci.xml"
-  - name: "Infra-IaC"
-    xml: "infra-iac.xml"
-  - name: "Smoke-Tests"
-    xml: "smoke-tests.xml"
-
-vault_dockerhub_user: "jsegrod1512"
-vault_dockerhub_pass: "dckr_pat_o5qHaQXrA8UlhHmqNWNLsdjdzvM"
+# Puerto en el que Jenkins escuchará HTTP (por defecto 8080)
+jenkins_port: 8080

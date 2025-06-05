@@ -1,0 +1,26 @@
+# ──────────────────────────────────────────────────────────────────────────
+# Nombres exactos de los grupos LDAP para cada rol
+ldap_group_administradores: "Administradores"
+ldap_group_desarrolladores: "Desarrolladores"
+ldap_group_clientes:      "Clientes"
+
+# ──────────────────────────────────────────────────────────────────────────
+# Listas de paquetes según rol (puedes ampliarlas o reducirlas)
+paquetes_administrador:
+  - htop
+  - sudo
+  - vim
+  - curl
+
+paquetes_desarrollador:
+  - git
+  - docker.io
+  - build-essential
+  - gcc
+  - python3-pip
+
+paquetes_cliente:
+  - firefox
+  - libreoffice
+  - remmina
+# ──────────────────────────────────────────────────────────────────────────

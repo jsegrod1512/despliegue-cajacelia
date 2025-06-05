@@ -40,9 +40,15 @@
           bindpw {{ ldap_root_pass }}
           ldap_version 3
           tls_cacertdir /etc/ssl/certs
+
           filter passwd (&(objectClass=posixAccount)(uidNumber>=10000))
-          #filter group  (&(objectClass=posixGroup) (gidNumber>=10000))
-          filter group  (&(objectClass=posixGroup))
+          filter group  (&(objectClass=posixGroup) (gidNumber>=10000))
+
+          # Importante: para que nslcd reconozca memberUid como principal de grupo
+          map group    cn             cn
+          map group    gidNumber      gidNumber
+          map group    memberUid      memberUid
+
           nss_disable_enumeration no
       notify:
         - Restart nslcd
@@ -152,22 +158,23 @@
             module_path: pam_mkhomedir.so
             module_arguments: 'skel=/etc/skel umask=0022'
       notify:
-        - Restart nscd
-
-    # NUEVAS TAREAS: creación explícita de home-dirs
-    - name: Crear home directories para usuarios LDAP
-      file:
-        path: "{{ item.homeDirectory }}"
-        state: directory
-        owner: "{{ item.uid }}"
-        group: "{{ item.gidNumber }}"
-        mode: '0755'
-      loop: "{{ users }}"
-      loop_control:
-        label: "{{ item.uid }}"
-      notify:
         - Restart nslcd
         - Restart nscd
+
+    # Creación explícita de home-dirs
+    # - name: Crear home directories para usuarios LDAP
+    #   file:
+    #     path: "{{ item.homeDirectory }}"
+    #     state: directory
+    #     owner: "{{ item.uidNumber }}"
+    #     group: "{{ item.gidNumber }}"
+    #     mode: '0755'
+    #   loop: "{{ users }}"
+    #   loop_control:
+    #     label: "{{ item.uid }}"
+    #   notify:
+    #     - Restart nslcd
+    #     - Restart nscd
 
   handlers:
     - name: Restart nslcd

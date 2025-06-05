@@ -1,72 +1,84 @@
 ---
-- name: Instalar Jenkins LTS y Java en el nodo CI-CD
+- name: Instalar y configurar Jenkins en Ubuntu 24.04
   hosts: ci-cd
   become: true
-
   vars_files:
     - ../group_vars/jenkins.yml
 
   tasks:
-    - name: Actualizar caché de APT
+    - name: Actualizar cache de paquetes
       apt:
         update_cache: yes
-      tags: ['jenkins', 'java']
-    # Descarga el índice de paquetes más reciente. :contentReference[oaicite:0]{index=0}
+      tags: update
+      # Siempre actualizar antes de instalar paquetes :contentReference[oaicite:1]{index=1}
 
-    - name: Instalar dependencias necesarias para Jenkins (Java, curl, gnupg, ca-certificates)
+    - name: Instalar Java 17 y dependencias básicas
       apt:
         name:
-          - openjdk-11-jdk
-          - ca-certificates
-          - curl
-          - gnupg
-        state: present
-      tags: ['jenkins', 'java']
-    # Jenkins requiere Java; además usamos curl y gnupg para descargar y validar la clave. :contentReference[oaicite:1]{index=1}
-
-    - name: Descargar la clave GPG oficial de Jenkins LTS (abril 2023)
-      get_url:
-        url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key"
-        dest: "/usr/share/keyrings/jenkins-keyring.asc"
-        mode: '0644'
-      tags: ['jenkins', 'gpg']
-    # Esta es la clave publicada por Jenkins para LTS (ID 5BA31D57EF5975CA). :contentReference[oaicite:2]{index=2}
-
-    - name: Añadir repositorio de Jenkins LTS firmado con /usr/share/keyrings/jenkins-keyring.asc
-      apt_repository:
-        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
-        filename: "jenkins"
+          - "{{ java_package }}"
+          - wget
+          - apt-transport-https
         state: present
         update_cache: yes
-      tags: ['jenkins', 'repo']
-    # La entrada apunta a “https://pkg.jenkins.io/debian-stable binary/” y usa la clave recién descargada. :contentReference[oaicite:3]{index=3}
+      tags: dependencies
+      # Jenkins necesita Java 17; wget y apt-transport-https para agregar repositorios :contentReference[oaicite:2]{index=2}
 
-    - name: Instalar Jenkins LTS
+    - name: Descargar clave GPG oficial de Jenkins
+      get_url:
+        url: "{{ jenkins_gpg_key_url }}"
+        dest: /usr/share/keyrings/jenkins-keyring.asc
+        mode: '0644'
+      tags: key
+      # Importar la clave GPG de Jenkins para verificar paquetes :contentReference[oaicite:3]{index=3}
+
+    - name: Agregar repositorio de Jenkins a sources.list
+      copy:
+        dest: /etc/apt/sources.list.d/jenkins.list
+        content: "{{ jenkins_repo_entry }}\n"
+        owner: root
+        group: root
+        mode: '0644'
+      tags: repo
+      # Añadir entrada oficial de Jenkins :contentReference[oaicite:4]{index=4}
+
+    - name: Actualizar cache de paquetes tras agregar Jenkins repo
       apt:
-        name: jenkins
-        state: latest
-      tags: ['jenkins', 'install']
-    # Con el repositorio ya activo, descarga e instala el paquete jenkins. :contentReference[oaicite:4]{index=4}
+        update_cache: yes
+      tags: update
 
-    - name: Deshabilitar el setup wizard de Jenkins en arrancos futuros
-      lineinfile:
-        path: /etc/default/jenkins
-        regexp: '^JAVA_ARGS='
-        line: 'JAVA_ARGS="-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false"'
-        create: yes
-      tags: ['jenkins', 'jcasc']
-    # Esto evita que Jenkins pida la contraseña inicial “initialAdminPassword” al arrancar. 
+    - name: Instalar Jenkins
+      apt:
+        name: "{{ jenkins_package }}"
+        state: present
+        update_cache: yes
+      tags: install
+      # Instala el paquete Jenkins desde el repositorio agregado :contentReference[oaicite:5]{index=5}
 
-    - name: Reiniciar Jenkins para aplicar la desactivación del wizard
-      service:
-        name: jenkins
-        state: restarted
-      tags: ['jenkins', 'restart']
-    # Reinicia Jenkins de inmediato, para que arranque sin wizard. :contentReference[oaicite:6]{index=6}
-
-    - name: Habilitar Jenkins al inicio
-      service:
-        name: jenkins
+    - name: Iniciar y habilitar servicio Jenkins
+      systemd:
+        name: "{{ jenkins_service }}"
+        state: started
         enabled: yes
-      tags: ['jenkins', 'enable']
-    # Asegura que Jenkins arranque automáticamente al iniciar la máquina. :contentReference[oaicite:7]{index=7}
+      tags: service
+      # Asegura que Jenkins arranque ahora y al reiniciar :contentReference[oaicite:6]{index=6}
+
+    - name: Obtener contraseña inicial de Jenkins
+      command: cat /var/lib/jenkins/secrets/initialAdminPassword
+      register: jenkins_initial_password
+      changed_when: false
+      tags: password
+      # Lee la contraseña automática generada por Jenkins :contentReference[oaicite:8]{index=8}
+
+    - name: Mostrar contraseña inicial de Jenkins
+      debug:
+        msg: "Contraseña inicial de Jenkins: {{ jenkins_initial_password.stdout }}"
+      tags: password
+      # Muestra la contraseña para desbloquear Jenkins en el navegador :contentReference[oaicite:9]{index=9}
+
+  handlers:
+    - name: Reiniciar Jenkins
+      systemd:
+        name: "{{ jenkins_service }}"
+        state: restarted
+      tags: service_restart
+      # Handler para reiniciar Jenkins si fuera necesario :contentReference[oaicite:11]{index=11}

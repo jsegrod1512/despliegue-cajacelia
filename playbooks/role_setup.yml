@@ -1,0 +1,262 @@
+---
+- name: Configurar clientes Ubuntu 24.04 según rol LDAP (autostart + control de apps)
+  hosts: clients
+  become: true
+  vars_files:
+    - ../group_vars/clients.yml   # aquí defines ldap_group_administradores, ldap_group_desarrolladores, ldap_group_clientes, paquetes_administrador, paquetes_desarrollador, paquetes_cliente
+
+  pre_tasks:
+    - name: Asegurar que los paquetes LDAP Cliente estén instalados
+      apt:
+        name:
+          - libnss-ldapd
+          - libpam-ldapd
+          - nslcd
+          - ldap-utils
+          - nscd
+        state: present
+        update_cache: yes
+
+    - name: Esperar a que getent passwd funcione para ansible_user (LDAP propagado)
+      shell: "getent passwd {{ ansible_user }}"
+      register: getent_user
+      retries: 5
+      delay: 2
+      until: getent_user.stdout_lines | length > 0
+      changed_when: false
+      
+  tasks:
+    - name: Instalar paquetes de administrador, desarrollador y cliente (unificar lista única)
+      apt:
+        name: "{{ (paquetes_administrador + paquetes_desarrollador + paquetes_cliente) | unique }}"
+        state: present
+        update_cache: yes
+
+    - name: Asegurar directorios para herramientas específicas de rol
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - /opt/admin-tools
+        - /opt/dev-tools
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 1.b) Crear script de “consola de administración” para administradores
+    # ──────────────────────────────────────────────────────────────────────────
+    - name: Copiar script de consola de administración para administradores
+      copy:
+        dest: /opt/admin-tools/admin-console.sh
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          #
+          # admin-console.sh: Consola de administración para el rol de Administrador
+          # Aquí podrías invocar herramientas propias (cockpit, htop, logs, etc.)
+          # Para este ejemplo, abrimos un terminal con privilegios de root mediante sudo.
+
+          menu() {
+            echo "========================================"
+            echo " Consola de Administración - $USER"
+            echo "========================================"
+            echo "1) Abrir shell root"
+            echo "2) Ver estado de nslcd y nscd"
+            echo "3) Salir"
+            echo -n "Selecciona opción [1-3]: "
+            read opcion
+            case \"$opcion\" in
+              1)
+                # Abrir un gnome-terminal como root
+                exec gnome-terminal -- bash -c \"sudo -i; exec bash\"
+                ;;
+              2)
+                # Mostrar estado de servicios LDAP y cache
+                echo \"Estado de nslcd:\"
+                systemctl status nslcd --no-pager
+                echo
+                echo \"Estado de nscd:\"
+                systemctl status nscd --no-pager
+                echo
+                echo \"Pulsa ENTER para volver al menú...\"
+                read _
+                menu
+                ;;
+              *)
+                exit 0
+                ;;
+            esac
+          }
+
+          # Llamamos al menú
+          menu
+
+    ###########################################################################
+    # 2) Script de autostart para GUI: lanza la app correcta según rol         #
+    ###########################################################################
+    - name: Crear script de autostart para lanzar app según rol en GUI
+      copy:
+        dest: /usr/local/bin/auto_launch_role_app.sh
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          #
+          # Este script se ejecuta en el arranque de la sesión gráfica.
+          # Detecta el rol LDAP y lanza:
+          #   - Administrador: consola de administración personalizada
+          #   - Desarrollador: Jenkins en http://172.16.1.10:8080
+          #   - Cliente: Firefox con la app bancaria
+          #
+          USER_NAME="${USER}"
+          ROLE="sin_rol"
+          export ROLE
+
+          is_in_group() {
+            local grp="$1"
+            getent group "${grp}" | grep -qw "${USER_NAME}"
+          }
+
+          if is_in_group "{{ ldap_group_administradores }}"; then
+            ROLE="administrador"
+          elif is_in_group "{{ ldap_group_desarrolladores }}"; then
+            ROLE="desarrollador"
+          elif is_in_group "{{ ldap_group_clientes }}"; then
+            ROLE="cliente"
+          fi
+
+          case "${ROLE}" in
+            administrador)
+              # Invocamos la consola de administración personalizada
+              nohup /opt/admin-tools/admin-console.sh &>/dev/null &
+              ;;
+            desarrollador)
+              # Abrir Jenkins en el navegador
+              nohup /usr/bin/firefox --new-window "http://172.16.1.10:8080" &>/dev/null &
+              ;;
+            cliente)
+              # Abrir la app bancaria
+              nohup /usr/bin/firefox --new-window "http://cajacelia.ddns.net" &>/dev/null &
+              ;;
+            *)
+              ;;
+          esac
+
+    - name: Crear entrada .desktop para autostart de apps según rol
+      copy:
+        dest: /etc/xdg/autostart/auto-launch-role-app.desktop
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Desktop Entry]
+          Type=Application
+          Name=AutoLaunchRoleApp
+          Exec=/usr/local/bin/auto_launch_role_app.sh
+          X-GNOME-Autostart-enabled=true
+          NoDisplay=true
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Resto de tareas (ocultar iconos en /etc/skel, ACLs, home_permissions, sudoers)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    - name: Asegurar que /etc/skel/Desktop existe (para usuarios nuevos)
+      file:
+        path: /etc/skel/Desktop
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Ocultar iconos de aplicaciones no permitidas para rol cliente
+      copy:
+        dest: /etc/skel/Desktop/ocultar_apps_rol_cliente.sh
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          #
+          # Este script se copiará a cada home nuevo (vía /etc/skel) y, al iniciar 
+          # sesión gráfica, ocultará accesos directos de apps no permitidas para clientes.
+          USER_NAME="${USER}"
+          is_in_group() {
+            local grp="$1"
+            getent group "${grp}" | grep -qw "${USER_NAME}"
+          }
+
+          if is_in_group "{{ ldap_group_clientes }}"; then
+            DESKTOP_DIR="${HOME}/Desktop"
+            if [ -d "${DESKTOP_DIR}" ]; then
+              touch "${DESKTOP_DIR}/gnome-terminal.desktop.disabled"
+              touch "${DESKTOP_DIR}/docker.desktop.disabled"
+            fi
+          fi
+
+    - name: Bloquear ejecución de Docker para rol 'cliente' (usando ACL)
+      acl:
+        path: /usr/bin/docker
+        entity: "{{ ldap_group_clientes }}"
+        etype: group
+        permissions: '---'
+        state: present
+
+    - name: Bloquear ejecución de gnome-terminal para rol 'cliente'
+      acl:
+        path: /usr/bin/gnome-terminal
+        entity: "{{ ldap_group_clientes }}"
+        etype: group
+        permissions: '---'
+        state: present
+
+    - name: Bloquear ejecución de htop para rol 'cliente'
+      acl:
+        path: /usr/bin/htop
+        entity: "{{ ldap_group_clientes }}"
+        etype: group
+        permissions: '---'
+        state: present
+
+    - name: Ajustar permisos del home del usuario tras login
+      copy:
+        dest: /etc/profile.d/home_permissions.sh
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # Asegura que el home tenga permisos 0700 y dueño LDAP correcto
+          USER_NAME="${USER}"
+          if [ -n "$HOME" ] && [ -d "$HOME" ]; then
+            chown "${USER_NAME}:${USER_NAME}" "${HOME}"
+            chmod 0700 "${HOME}"
+          fi
+
+    - name: Configurar sudoers para roles LDAP
+      copy:
+        dest: /etc/sudoers.d/99-roles-ldap
+        owner: root
+        group: root
+        mode: '0440'
+        content: |
+          %{{ ldap_group_administradores }}   ALL=(ALL) NOPASSWD: ALL
+          %{{ ldap_group_desarrolladores }}   ALL=(ALL) NOPASSWD: /usr/bin/docker
+          # Clientes no reciben permiso sudo
+        validate: 'visudo -cf %s'
+
+  handlers:
+    - name: Restart nslcd
+      service:
+        name: nslcd
+        state: restarted
+        enabled: true
+
+    - name: Restart nscd
+      service:
+        name: nscd
+        state: restarted
+        enabled: true
