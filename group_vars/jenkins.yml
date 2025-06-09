@@ -1,5 +1,4 @@
-# -------------------------------------------------------------------
-# Ya tenías estas variables para instalación básica de Jenkins
+# Variables para instalación básica de Jenkins
 java_package: "openjdk-17-jdk"
 jenkins_gpg_key_url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key"
 jenkins_repo_entry: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
@@ -7,12 +6,11 @@ jenkins_package: "jenkins"
 jenkins_service: "jenkins"
 jenkins_port: 8080
 
-# -------------------------------------------------------------------
-# Nuevas variables para instalar plugins con CLI
-jenkins_admin_user: "admin"               # Usuario que creaste en el wizard
-jenkins_admin_password: "SuContra123!"    # Contraseña que asignaste en el wizard
+# Usuario y contraseña de administrador de Jenkins a configurar
+jenkins_admin_user: "admin"        
+jenkins_admin_password: "SuContra123!"    
 
-# Lista de plugins que quieras instalar automáticamente
+# Lista de plugins
 jenkins_plugins:
   - git
   - workflow-aggregator

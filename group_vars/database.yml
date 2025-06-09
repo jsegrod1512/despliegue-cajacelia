@@ -1,15 +1,7 @@
 # Variables para la base de datos MySQL
-
 mysql_root_pass:    "{{ vault_mysql_root_pass }}"
 mysql_bind_address: "0.0.0.0"
 mysql_port:         3306
-
-# Base de datos LDAP (si aún la mantienes)
-db:
-  host:     "172.16.1.11"
-  name:     "ldap"
-  user:     "ldapbind"
-  password: "{{ vault_ldap_bind_pass }}"
 
 # Base de datos de la app
 app_db:
@@ -18,7 +10,7 @@ app_db:
   user:     "app_user"
   password: "{{ vault_app_db_password }}"
 
-# Contraseñas en Vault
+# Contraseñas en Ansible Vault (proximamente)
 vault_mysql_root_pass: "R00tP4ssw0rd$MySQL"
 vault_ldap_bind_pass:  "LdapB1nd$ecur3"
 vault_app_db_password: "S3gura!P455w0rdWebApp"

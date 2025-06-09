@@ -1,11 +1,9 @@
-# ──────────────────────────────────────────────────────────────────────────
-# Nombres exactos de los grupos LDAP para cada rol
+# Grupos LDAP para cada rol
 ldap_group_administradores: "Administradores"
 ldap_group_desarrolladores: "Desarrolladores"
 ldap_group_clientes:      "Clientes"
 
-# ──────────────────────────────────────────────────────────────────────────
-# Listas de paquetes según rol (puedes ampliarlas o reducirlas)
+# Listas de paquetes según rol
 paquetes_administrador:
   - htop
   - sudo
@@ -23,7 +21,7 @@ paquetes_cliente:
   - firefox
   - libreoffice
   - remmina
-# ──────────────────────────────────────────────────────────────────────────
 
+# Contraseñas para autenticar contra el proxy (No configurado)
 proxy_user: dev1
 proxy_pass: devpass1

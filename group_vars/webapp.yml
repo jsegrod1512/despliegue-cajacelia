@@ -17,7 +17,7 @@ ldap_user_dn: "ou=Users,{{ base_dn }}"
 db_host: "{{ db.host | default('172.16.1.11') }}"
 db_name: "app_db"
 db_user: "app_user"
-db_pass: "{{ vault_app_db_password }}"  # definida en Vault o aquí
+db_pass: "{{ vault_app_db_password }}" 
 
-# Variables sensibles (recomiendo Ansible Vault)
+# Variables Ansible Vault (proximamente)
 vault_app_db_password: "S3gura!P455w0rdWebApp"
