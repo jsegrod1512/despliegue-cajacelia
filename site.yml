@@ -5,6 +5,8 @@
 # - import_playbook: playbooks/database.yml
 # - import_playbook: playbooks/deploy_database.yml
 # - import_playbook: playbooks/webapp.yml
-- import_playbook: playbooks/role_setup.yml
+# - import_playbook: playbooks/role_setup.yml
 # - import_playbook: playbooks/install_jenkins.yml
+# - import_playbook: playbooks/jenkins_plugins.yml
+- import_playbook: playbooks/deploy_jenkins.yml
 # - import_playbook: playbooks/clear.yml

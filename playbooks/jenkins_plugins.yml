@@ -1,0 +1,43 @@
+---
+- name: Instalar plugins en Jenkins usando CLI
+  hosts: ci-cd
+  become: true
+  vars_files:
+    - ../group_vars/jenkins.yml
+
+  tasks:
+    - name: Esperar a que Jenkins esté disponible en el puerto {{ jenkins_port }}
+      wait_for:
+        host: "127.0.0.1"
+        port: "{{ jenkins_port }}"
+        delay: 5
+        timeout: 300
+
+    - name: Descargar jenkins-cli.jar
+      get_url:
+        url: "http://127.0.0.1:{{ jenkins_port }}/jnlpJars/jenkins-cli.jar"
+        dest: "/tmp/jenkins-cli.jar"
+        mode: '0644'
+
+    - name: Instalar plugins con Jenkins CLI (un comando para todos)
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s http://127.0.0.1:{{ jenkins_port }}/ \
+          -auth "{{ jenkins_admin_user }}:{{ jenkins_admin_password }}" \
+          install-plugin {{ jenkins_plugins | join(" ") }}
+      args:
+        warn: false
+
+    - name: Safe-restart de Jenkins tras instalar plugins
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s http://127.0.0.1:{{ jenkins_port }}/ \
+          -auth "{{ jenkins_admin_user }}:{{ jenkins_admin_password }}" \
+          safe-restart
+      args:
+        warn: false
+
+    - name: Esperar a que Jenkins reaparezca tras el safe-restart
+      wait_for:
+        host: "127.0.0.1"
+        port: "{{ jenkins_port }}"
+        delay: 5
+        timeout: 300

@@ -1,0 +1,181 @@
+---
+- name: "Crear Pipeline WebApp-Redeploy vía CLI"
+  hosts: ci-cd
+  become: true
+  vars_files:
+    - ../group_vars/jenkins.yml
+    - ../group_vars/webapp.yml
+
+  tasks:
+    - name: Esperar a que Jenkins devuelva HTTP 200 en /login
+      uri:
+        url: "http://127.0.0.1:{{ jenkins_port }}/login"
+        status_code: 200
+      register: jenkins_login_ready
+      retries: 20
+      delay: 5
+      until: jenkins_login_ready.status == 200
+
+    - name: Esperar a que jenkins-cli.jar esté disponible
+      uri:
+        url: "http://127.0.0.1:{{ jenkins_port }}/jnlpJars/jenkins-cli.jar"
+        status_code: 200
+      register: cli_jar_ready
+      retries: 20
+      delay: 5
+      until: cli_jar_ready.status == 200
+
+    - name: Descargar jenkins-cli.jar
+      get_url:
+        url: "http://127.0.0.1:{{ jenkins_port }}/jnlpJars/jenkins-cli.jar"
+        dest: "/tmp/jenkins-cli.jar"
+        mode: '0644'
+
+    - name: Crear pipeline Job “WebApp-Redeploy” vía Jenkins CLI
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s http://127.0.0.1:{{ jenkins_port }}/ \
+          -auth "{{ jenkins_admin_user }}:{{ jenkins_admin_password }}" create-job WebApp-Redeploy << 'EOF'
+        <flow-definition plugin="workflow-job">
+          <actions/>
+          <description>Pipeline que detecta cambios en Git y redepliega la WebApp</description>
+          <keepDependencies>false</keepDependencies>
+
+          <properties>
+            <!-- PollSCM cada minuto -->
+            <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+              <triggers>
+                <hudson.triggers.SCMTrigger>
+                  <spec>H/1 * * * *</spec>
+                  <ignorePostCommitHooks>false</ignorePostCommitHooks>
+                </hudson.triggers.SCMTrigger>
+              </triggers>
+            </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+          </properties>
+
+          <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps">
+            <script>
+        pipeline {
+          agent any
+
+          environment {
+            APP_REPO       = "{{ app_repo }}"
+            APP_DEST       = "{{ app_dest }}"
+            VENV_PATH      = "{{ venv_path }}"
+            DB_HOST        = "{{ db_host }}"
+            DB_NAME        = "{{ db_name }}"
+            DB_USER        = "{{ db_user }}"
+            DB_PASS        = "{{ db_pass }}"
+            FLASK_SECRET   = "{{ flask_secret_key }}"
+            WEB_USER       = "jenkins"
+            WEB_SERVER_IP  = "10.1.0.10"
+            SERVICE_NAME   = "webapp"
+          }
+
+          stages {
+            stage('Checkout') {
+              steps {
+                // Clonar o actualizar en el workspace de Jenkins
+                git branch: 'main', url: "${APP_REPO}"
+              }
+            }
+
+            stage('Deploy to WebServer') {
+              steps {
+                // Conexión SSH para redeploy
+                sh """
+                  ssh -o StrictHostKeyChecking=no ${WEB_USER}@${WEB_SERVER_IP} << 'SSH_EOF'
+                    set -e
+
+                    # Si no existe la carpeta APP_DEST, clonar y preparar venv
+                    if [ ! -d "${APP_DEST}" ]; then
+                      echo "=== Clonando repo en ${APP_DEST} ==="
+                      git clone ${APP_REPO} ${APP_DEST}
+                    fi
+
+                    cd ${APP_DEST}
+
+                    echo "=== Haciendo git pull ==="
+                    git pull origin main
+
+                    # Si no existe el virtualenv, crearlo y pip install
+                    if [ ! -d "${VENV_PATH}" ]; then
+                      echo "=== Creando virtualenv en ${VENV_PATH} ==="
+                      python3 -m venv ${VENV_PATH}
+                    fi
+
+                    echo "=== Instalando dependencias ==="
+                    source ${VENV_PATH}/bin/activate
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
+
+                    # Actualizar config.py con variables de entorno
+                    cat > config.py << 'CONFIG_EOF'
+        import os
+        class Config:
+            SECRET_KEY = os.getenv('FLASK_SECRET', '${FLASK_SECRET}')
+            SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://${DB_USER}:${DB_PASS}@${DB_HOST}/${DB_NAME}'
+            LDAP_HOST = '${ldap_server.replace('ldap://','')}'
+            LDAP_PORT = 389
+            LDAP_USE_SSL = False
+            LDAP_BASE_DN = '${base_dn}'
+            LDAP_USER_DN = '${ldap_user_dn.replace("{{ base_dn }}", base_dn)}'
+        CONFIG_EOF
+
+                    # Reiniciar el servicio
+                    echo "=== Reiniciando servicio ${SERVICE_NAME} ==="
+                    sudo systemctl restart ${SERVICE_NAME}
+                    sudo systemctl status ${SERVICE_NAME} --no-pager
+                  SSH_EOF
+                """
+              }
+            }
+          }
+
+          post {
+            success {
+              echo "Deployment completado correctamente."
+            }
+            failure {
+              echo "¡Error en el Deployment!"
+              mail to: 'ops-team@cajacelia.es',
+                   subject: "Build FALLIDO: WebApp-Redeploy #${BUILD_NUMBER}",
+                   body: "Revisa la consola de Jenkins: ${BUILD_URL}"
+            }
+          }
+        }
+            </script>
+            <sandbox>true</sandbox>
+          </definition>
+
+          <triggers/>
+        </flow-definition>
+        EOF
+      args:
+        executable: /bin/bash
+
+    - name: Verificar que existe el job “WebApp-Redeploy”
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s http://127.0.0.1:{{ jenkins_port }}/ \
+          -auth "{{ jenkins_admin_user }}:{{ jenkins_admin_password }}" get-job WebApp-Redeploy
+      register: job_check
+      failed_when: job_check.rc != 0
+      changed_when: false
+
+    - name: (Opcional) Lanzar build de prueba en “WebApp-Redeploy”
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s http://127.0.0.1:{{ jenkins_port }}/ \
+          -auth "{{ jenkins_admin_user }}:{{ jenkins_admin_password }}" build WebApp-Redeploy -s
+      args:
+        warn: false
+
+    - name: (Opcional) Mostrar consola del build #1 de “WebApp-Redeploy”
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s http://127.0.0.1:{{ jenkins_port }}/ \
+          -auth "{{ jenkins_admin_user }}:{{ jenkins_admin_password }}" console WebApp-Redeploy 1
+      register: console_output
+      failed_when: false
+      changed_when: false
+
+    - name: Mostrar la salida de consola del build de prueba
+      debug:
+        var: console_output.stdout_lines

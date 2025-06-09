@@ -1,18 +1,30 @@
----
-# Paquete de Java requerido por Jenkins (OpenJDK 17 en Ubuntu 24.04)
-java_package: "openjdk-17-jdk" 
-
-# URL de la clave GPG oficial de Jenkins para verificar el repositorio
-jenkins_gpg_key_url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key" 
-
-# Entrada para /etc/apt/sources.list.d/jenkins.list (repositorio oficial de Jenkins)
-jenkins_repo_entry: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" 
-
-# Nombre del paquete que se instalará (desde el repositorio de Jenkins)
-jenkins_package: "jenkins"  
-
-# Nombre del servicio systemd de Jenkins
-jenkins_service: "jenkins" 
-
-# Puerto en el que Jenkins escuchará HTTP (por defecto 8080)
+# -------------------------------------------------------------------
+# Ya tenías estas variables para instalación básica de Jenkins
+java_package: "openjdk-17-jdk"
+jenkins_gpg_key_url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key"
+jenkins_repo_entry: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+jenkins_package: "jenkins"
+jenkins_service: "jenkins"
 jenkins_port: 8080
+
+# -------------------------------------------------------------------
+# Nuevas variables para instalar plugins con CLI
+jenkins_admin_user: "admin"               # Usuario que creaste en el wizard
+jenkins_admin_password: "SuContra123!"    # Contraseña que asignaste en el wizard
+
+# Lista de plugins que quieras instalar automáticamente
+jenkins_plugins:
+  - git
+  - workflow-aggregator
+  - docker-workflow
+  - ldap
+  - role-strategy
+  - credentials-binding
+  - email-ext
+  - blueocean
+  - matrix-auth
+  - ansicolor
+
+extra_plugins:
+      - "job-dsl"
+      - "pipeline-utility-steps"

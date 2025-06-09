@@ -1,5 +1,5 @@
 ---
-- name: Instalar y configurar Jenkins en Ubuntu 24.04
+- name: Instalación base de Jenkins
   hosts: ci-cd
   become: true
   vars_files:
@@ -9,76 +9,52 @@
     - name: Actualizar cache de paquetes
       apt:
         update_cache: yes
-      tags: update
-      # Siempre actualizar antes de instalar paquetes :contentReference[oaicite:1]{index=1}
 
-    - name: Instalar Java 17 y dependencias básicas
+    - name: Instalar Java 17 y utilidades
       apt:
         name:
           - "{{ java_package }}"
           - wget
           - apt-transport-https
+          - ca-certificates
         state: present
         update_cache: yes
-      tags: dependencies
-      # Jenkins necesita Java 17; wget y apt-transport-https para agregar repositorios :contentReference[oaicite:2]{index=2}
 
-    - name: Descargar clave GPG oficial de Jenkins
+    - name: Descargar clave GPG oficial Jenkins
       get_url:
         url: "{{ jenkins_gpg_key_url }}"
         dest: /usr/share/keyrings/jenkins-keyring.asc
         mode: '0644'
-      tags: key
-      # Importar la clave GPG de Jenkins para verificar paquetes :contentReference[oaicite:3]{index=3}
 
-    - name: Agregar repositorio de Jenkins a sources.list
+    - name: Agregar repositorio de Jenkins
       copy:
         dest: /etc/apt/sources.list.d/jenkins.list
         content: "{{ jenkins_repo_entry }}\n"
-        owner: root
-        group: root
         mode: '0644'
-      tags: repo
-      # Añadir entrada oficial de Jenkins :contentReference[oaicite:4]{index=4}
 
-    - name: Actualizar cache de paquetes tras agregar Jenkins repo
+    - name: Actualizar cache tras agregar Jenkins repo
       apt:
         update_cache: yes
-      tags: update
 
     - name: Instalar Jenkins
       apt:
         name: "{{ jenkins_package }}"
         state: present
         update_cache: yes
-      tags: install
-      # Instala el paquete Jenkins desde el repositorio agregado :contentReference[oaicite:5]{index=5}
 
-    - name: Iniciar y habilitar servicio Jenkins
+    - name: Iniciar y habilitar Jenkins
       systemd:
         name: "{{ jenkins_service }}"
         state: started
         enabled: yes
-      tags: service
-      # Asegura que Jenkins arranque ahora y al reiniciar :contentReference[oaicite:6]{index=6}
 
-    - name: Obtener contraseña inicial de Jenkins
-      command: cat /var/lib/jenkins/secrets/initialAdminPassword
-      register: jenkins_initial_password
-      changed_when: false
-      tags: password
-      # Lee la contraseña automática generada por Jenkins :contentReference[oaicite:8]{index=8}
-
-    - name: Mostrar contraseña inicial de Jenkins
+    - name: Mostrar mensaje para completar el wizard manualmente
       debug:
-        msg: "Contraseña inicial de Jenkins: {{ jenkins_initial_password.stdout }}"
-      tags: password
-      # Muestra la contraseña para desbloquear Jenkins en el navegador :contentReference[oaicite:9]{index=9}
-
-  handlers:
-    - name: Reiniciar Jenkins
-      systemd:
-        name: "{{ jenkins_service }}"
-        state: restarted
-      tags: service_restart
-      # Handler para reiniciar Jenkins si fuera necesario :contentReference[oaicite:11]{index=11}
+        msg: |
+          Jenkins ha sido instalado y arrancado en el puerto {{ jenkins_port }}.
+          Por favor, abre tu navegador en http://<IP>:{{ jenkins_port }},
+          introduce la Initial Admin Password y completa el wizard para crear 
+          el usuario {{ jenkins_admin_user }} con contraseña 
+          {{ jenkins_admin_password }}. Luego, ejecuta de nuevo este playbook 
+          para instalar los plugins automáticamente.
+      when: true
