@@ -3,7 +3,7 @@
   hosts: clients
   become: true
   vars_files:
-    - ../group_vars/clients.yml   # aquí defines ldap_group_administradores, ldap_group_desarrolladores, ldap_group_clientes, paquetes_administrador, paquetes_desarrollador, paquetes_cliente
+    - ../group_vars/clients.yml
 
   pre_tasks:
     - name: Asegurar que los paquetes LDAP Cliente estén instalados
@@ -44,7 +44,7 @@
         - /opt/dev-tools
 
     # ──────────────────────────────────────────────────────────────────────────
-    # 1.b) Crear script de “consola de administración” para administradores
+    # 1) Crear script de “consola de administración” para administradores
     # ──────────────────────────────────────────────────────────────────────────
     - name: Copiar script de consola de administración para administradores
       copy:
@@ -302,8 +302,8 @@
         state: restarted
         enabled: true
 
-    - name: Update Dconf
-      command: dconf update
-      args:
-        warn: false
-      changed_when: true
+    # - name: Update Dconf
+    #   command: dconf update
+    #   args:
+    #     warn: false
+    #   changed_when: true

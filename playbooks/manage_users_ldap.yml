@@ -3,8 +3,8 @@
   hosts: ldap
   become: true
   vars_files:
-    - ../group_vars/ldap.yml    # base_dn, ldap_root_dn, ldap_root_pass
-    - ../users/users.yml              # users: [...]
+    - ../group_vars/ldap.yml
+    - ../users/users.yml
 
   tasks:
     - name: Instalar dependencias LDAP

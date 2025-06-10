@@ -3,8 +3,8 @@
   hosts: clients
   become: true
   vars_files:
-    - ../group_vars/ldap.yml   # ldap_uri, base_dn, ldap_root_dn, ldap_root_pass
-    - ../users/users.yml             # users: [...] con uid, homeDirectory, gidNumber, etc.
+    - ../group_vars/ldap.yml
+    - ../users/users.yml
 
   vars:
     ansible_python_interpreter: /usr/bin/python3
@@ -143,6 +143,36 @@
       notify:
         - Restart nscd
 
+    - name: Asegurar que SSHD usa pam_mkhomedir en sesión
+      blockinfile:
+        path: /etc/pam.d/sshd
+        insertafter: '^@include common-session'
+        block: |
+          # >>> mkhomedir for LDAP users >>>
+          session    required     pam_mkhomedir.so skel=/etc/skel umask=0022
+          # <<< mkhomedir for LDAP users <<<
+
+    - name: Asegurar que GDM usa pam_mkhomedir en sesión
+      blockinfile:
+        path: /etc/pam.d/gdm-password
+        insertafter: '^@include common-session'
+        block: |
+          # >>> mkhomedir for LDAP users >>>
+          session    required     pam_mkhomedir.so skel=/etc/skel umask=0022
+          # <<< mkhomedir for LDAP users <<<
+
+    - name: Asegurar que el paquete con pam_mkhomedir está instalado
+      apt:
+        name: libpam-modules
+        state: present
+        update_cache: yes
+
+    - name: Vaciar caché de NSS (nscd) tras instalar PAM mkhomedir
+      service:
+        name: nscd
+        state: restarted
+        enabled: yes
+
     - name: Configurar PAM common-session
       block:
         - community.general.pamd:
@@ -154,14 +184,14 @@
         - community.general.pamd:
             name: common-session
             type: session
-            control: optional
+            control: required
             module_path: pam_mkhomedir.so
             module_arguments: 'skel=/etc/skel umask=0022'
       notify:
         - Restart nslcd
         - Restart nscd
 
-    # Creación explícita de home-dirs
+    # Creación explícita de home-dirs (no es necesario con pam_mkhomedir)
     # - name: Crear home directories para usuarios LDAP
     #   file:
     #     path: "{{ item.homeDirectory }}"
