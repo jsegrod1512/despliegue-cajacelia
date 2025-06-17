@@ -13,7 +13,7 @@ def can_ssh(ip, port=22, timeout=0.5):
     except:
         return False
 
-# Escaneo concurrente
+# Escaneo
 reachable = []
 with ThreadPoolExecutor(max_workers=20) as pool:
     futures = {pool.submit(can_ssh, ip): ip for ip in clients}
@@ -28,7 +28,7 @@ inventory = {
     "_meta": { "hostvars": {} }
 }
 
-# Hostvars para cada cliente (usa la insecure_private_key común)
+# Variables para cada cliente (de momento solo funciona con uno)
 for ip in reachable:
     inventory["_meta"]["hostvars"][ip] = {
         "ansible_host":               ip,
